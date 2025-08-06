@@ -179,6 +179,9 @@ async function processTeraboxLink(chatId, teraboxUrl, password) {
     const html = await initialResponse.text()
     console.log('Initial page loaded, length:', html.length)
     
+    // Log a sample of the HTML for debugging
+    console.log('HTML sample:', html.substring(0, 1000))
+    
     // Get cookies from initial response (like Playwright's context)
     const cookies = initialResponse.headers.get('set-cookie') || ''
     console.log('Initial cookies:', cookies)
@@ -189,31 +192,18 @@ async function processTeraboxLink(chatId, teraboxUrl, password) {
       console.log('Cookie popup detected, would accept in browser')
     }
     
-    // Step 3: Fill the URL input and click "Fetch Files" (like Playwright's fill and click)
-    // Find the form action URL
-    const formMatch = html.match(/<form[^>]*method="([^"]*)"[^>]*action="([^"]*)"[^>]*>/i)
-    if (!formMatch) {
+    // Step 3: Find the form and its action URL with more flexible patterns
+    const formInfo = extractFormInfo(html)
+    if (!formInfo) {
       throw new Error('Could not find form in the page')
     }
     
-    const formMethod = formMatch[1].toUpperCase()
-    let formAction = formMatch[2]
-    
-    // If formAction is relative, make it absolute
-    if (!formAction.startsWith('http')) {
-      formAction = new URL(formAction, 'https://teraboxdl.site/').toString()
-    }
-    
-    console.log('Form method:', formMethod)
-    console.log('Form action:', formAction)
+    console.log('Form method:', formInfo.method)
+    console.log('Form action:', formInfo.action)
     
     // Extract all input fields from the form
-    const inputFields = {}
-    const inputRegex = /<input[^>]*name="([^"]*)"[^>]*value="([^"]*)"[^>]*>/gi
-    let inputMatch
-    while ((inputMatch = inputRegex.exec(html)) !== null) {
-      inputFields[inputMatch[1]] = inputMatch[2]
-    }
+    const inputFields = extractInputFields(html)
+    console.log('Extracted input fields:', inputFields)
     
     // Override with our URL and password (like Playwright's page.fill)
     inputFields['url'] = teraboxUrl
@@ -221,20 +211,20 @@ async function processTeraboxLink(chatId, teraboxUrl, password) {
       inputFields['password'] = password
     }
     
-    console.log('Form fields:', inputFields)
+    console.log('Final form fields:', inputFields)
     
     // Step 4: Submit the form (like Playwright's click on "Fetch Files")
     let submitResponse
-    if (formMethod === 'POST') {
+    if (formInfo.method.toUpperCase() === 'POST') {
       const formData = new URLSearchParams()
       for (const [key, value] of Object.entries(inputFields)) {
         formData.append(key, value)
       }
       
-      console.log('Submitting form via POST to:', formAction)
+      console.log('Submitting form via POST to:', formInfo.action)
       console.log('Form data:', formData.toString())
       
-      submitResponse = await fetchWithTimeout(formAction, {
+      submitResponse = await fetchWithTimeout(formInfo.action, {
         method: 'POST',
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36',
@@ -251,7 +241,7 @@ async function processTeraboxLink(chatId, teraboxUrl, password) {
       }, 20000)
     } else {
       // GET method
-      const url = new URL(formAction)
+      const url = new URL(formInfo.action)
       for (const [key, value] of Object.entries(inputFields)) {
         url.searchParams.append(key, value)
       }
@@ -300,6 +290,73 @@ async function processTeraboxLink(chatId, teraboxUrl, password) {
     console.error('Error processing Terabox link:', error)
     await sendMessage(chatId, `❌ Error: ${error.message}`)
   }
+}
+
+function extractFormInfo(html) {
+  // Try multiple patterns to find the form
+  
+  // Pattern 1: Standard form with method and action
+  let match = html.match(/<form[^>]*method="([^"]*)"[^>]*action="([^"]*)"[^>]*>/i)
+  if (match) {
+    const method = match[1] || 'GET'
+    let action = match[2]
+    
+    // If action is relative, make it absolute
+    if (action && !action.startsWith('http')) {
+      action = new URL(action, 'https://teraboxdl.site/').toString()
+    }
+    
+    return { method, action }
+  }
+  
+  // Pattern 2: Form with action only (default method is GET)
+  match = html.match(/<form[^>]*action="([^"]*)"[^>]*>/i)
+  if (match) {
+    let action = match[1]
+    
+    // If action is relative, make it absolute
+    if (action && !action.startsWith('http')) {
+      action = new URL(action, 'https://teraboxdl.site/').toString()
+    }
+    
+    return { method: 'GET', action }
+  }
+  
+  // Pattern 3: Form with method only (action is current URL)
+  match = html.match(/<form[^>]*method="([^"]*)"[^>]*>/i)
+  if (match) {
+    return { method: match[1], action: 'https://teraboxdl.site/' }
+  }
+  
+  // Pattern 4: Any form tag (default method GET, action current URL)
+  match = html.match(/<form[^>]*>/i)
+  if (match) {
+    return { method: 'GET', action: 'https://teraboxdl.site/' }
+  }
+  
+  // If no form found, return null
+  return null
+}
+
+function extractInputFields(html) {
+  const fields = {}
+  
+  // Extract all input fields with name and value
+  const inputRegex = /<input[^>]*name="([^"]*)"[^>]*value="([^"]*)"[^>]*>/gi
+  let match
+  while ((match = inputRegex.exec(html)) !== null) {
+    fields[match[1]] = match[2]
+  }
+  
+  // Also look for input fields without value attribute (default to empty string)
+  const inputNoValueRegex = /<input[^>]*name="([^"]*)"[^>]*>/gi
+  while ((match = inputNoValueRegex.exec(html)) !== null) {
+    if (!fields[match[1]]) { // Only add if not already found
+      fields[match[1]] = ''
+    }
+  }
+  
+  return fields
 }
 
 function extractDownloadLinksFromResponse(html) {
@@ -421,4 +478,4 @@ function fetchWithTimeout(url, options, timeout = 10000) {
       setTimeout(() => reject(new Error('Request timeout')), timeout)
     )
   ])
-        }
+  }
