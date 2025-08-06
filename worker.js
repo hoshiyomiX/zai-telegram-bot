@@ -7,34 +7,37 @@ async function handleRequest(event) {
   
   // Handle GET requests (for webhook verification)
   if (request.method === 'GET') {
-    console.log('Received GET request')
     return new Response('Terabox Bot is running!')
   }
   
   // Handle POST requests (for Telegram updates)
   if (request.method === 'POST') {
-    console.log('Received POST request')
-    
-    // Clone the request to avoid body stream issues
-    const requestClone = request.clone()
-    
-    // Immediately respond to Telegram to avoid timeout
-    const response = new Response('OK')
-    
-    // Process the update in the background
-    event.waitUntil(handleUpdate(requestClone))
-    
-    return response
+    try {
+      // Clone the request to read the body
+      const requestClone = request.clone()
+      
+      // Read the request body before sending response
+      const update = await requestClone.json()
+      
+      // Immediately respond to Telegram to avoid timeout
+      const response = new Response('OK')
+      
+      // Process the update in the background
+      event.waitUntil(handleUpdate(update))
+      
+      return response
+    } catch (error) {
+      console.error('Error handling request:', error)
+      return new Response('Error', { status: 500 })
+    }
   }
   
   return new Response('Method not allowed', { status: 405 })
 }
 
-async function handleUpdate(request) {
+async function handleUpdate(update) {
   try {
-    console.log('Processing update...')
-    const update = await request.json()
-    console.log('Update received:', JSON.stringify(update))
+    console.log('Processing update:', JSON.stringify(update))
     
     if (!update.message) {
       console.log('No message in update')
@@ -217,4 +220,4 @@ function fetchWithTimeout(url, options, timeout = 10000) {
       setTimeout(() => reject(new Error('Request timeout')), timeout)
     )
   ])
-        }
+}
