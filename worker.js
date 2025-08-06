@@ -99,7 +99,7 @@ async function handleUpdate(update) {
     // Send initial message to show we're working
     await sendMessage(chatId, "⏳ Processing your request, please wait...")
     
-    // Process the Terabox link
+    // Process the Terabox link using the adapted Playwright logic
     await processTeraboxLink(chatId, fullUrl, password)
   } catch (error) {
     console.error('Error processing update:', error)
@@ -160,27 +160,7 @@ async function processTeraboxLink(chatId, teraboxUrl, password) {
   try {
     console.log('Processing Terabox link with teraboxdl.site...')
     
-    // Try to find the correct form endpoint and method
-    const result = await tryFormSubmissionMethod(teraboxUrl, password)
-    
-    if (result.success) {
-      console.log('Successfully processed Terabox link')
-      await sendDownloadLinks(chatId, result.links)
-    } else {
-      console.log('Failed to process Terabox link:', result.error)
-      await sendMessage(chatId, `❌ Failed to process link: ${result.error}`)
-    }
-    
-  } catch (error) {
-    console.error('Error processing Terabox link:', error)
-    await sendMessage(chatId, `❌ Error: ${error.message}`)
-  }
-}
-
-async function tryFormSubmissionMethod(teraboxUrl, password) {
-  try {
-    // Step 1: Get initial page to find form endpoint
-    console.log('Getting initial page...')
+    // Step 1: Navigate to teraboxdl.site (like Playwright's page.goto)
     const initialResponse = await fetchWithTimeout('https://teraboxdl.site/', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36',
@@ -193,62 +173,31 @@ async function tryFormSubmissionMethod(teraboxUrl, password) {
     }, 10000)
     
     if (!initialResponse.ok) {
-      return { success: false, error: `Failed to access teraboxdl.site: ${initialResponse.status}` }
+      throw new Error(`Failed to access teraboxdl.site: ${initialResponse.status}`)
     }
     
     const html = await initialResponse.text()
     console.log('Initial page loaded, length:', html.length)
     
-    // Log a sample of the HTML for debugging
-    console.log('HTML sample:', html.substring(0, 1000))
+    // Get cookies from initial response (like Playwright's context)
+    const cookies = initialResponse.headers.get('set-cookie') || ''
+    console.log('Initial cookies:', cookies)
     
-    // Try multiple approaches to find the form
-    
-    // Approach 1: Look for a form with method and action
-    let formMatch = html.match(/<form[^>]*method="([^"]*)"[^>]*action="([^"]*)"[^>]*>/i)
-    if (!formMatch) {
-      // Approach 2: Look for any form tag
-      formMatch = html.match(/<form[^>]*action="([^"]*)"[^>]*>/i)
-      if (formMatch) {
-        // Default to POST if method not specified
-        formMatch = ['', 'POST', formMatch[1]]
-      } else {
-        // Approach 3: Look for form without action
-        formMatch = html.match(/<form[^>]*>/i)
-        if (formMatch) {
-          // Default to POST and current URL
-          formMatch = ['', 'POST', 'https://teraboxdl.site/']
-        }
-      }
+    // Step 2: Handle cookie popup (like Playwright's acceptBtn.click())
+    // Since we can't click, we'll just note that we would handle it
+    if (html.includes('Accept All')) {
+      console.log('Cookie popup detected, would accept in browser')
     }
     
+    // Step 3: Fill the URL input and click "Fetch Files" (like Playwright's fill and click)
+    // Find the form action URL
+    const formMatch = html.match(/<form[^>]*method="([^"]*)"[^>]*action="([^"]*)"[^>]*>/i)
     if (!formMatch) {
-      // If no form found, try to find input fields and submit button
-      console.log('No form found, looking for input fields and submit button')
-      
-      // Look for input fields
-      const inputFields = {}
-      const inputRegex = /<input[^>]*name="([^"]*)"[^>]*value="([^"]*)"[^>]*>/gi
-      let inputMatch
-      while ((inputMatch = inputRegex.exec(html)) !== null) {
-        inputFields[inputMatch[1]] = inputMatch[2]
-      }
-      
-      // Look for submit button
-      const submitMatch = html.match(/<button[^>]*type="submit"[^>]*name="([^"]*)"[^>]*>/i) ||
-                         html.match(/<input[^>]*type="submit"[^>]*name="([^"]*)"[^>]*>/i)
-      
-      if (Object.keys(inputFields).length > 0) {
-        // We found input fields, assume we can submit to the same URL
-        console.log('Found input fields but no form, will submit to root')
-        return await submitForm('https://teraboxdl.site/', 'POST', inputFields, teraboxUrl, password, initialResponse.headers.get('set-cookie') || '')
-      } else {
-        return { success: false, error: 'Could not find form or input fields in the page' }
-      }
+      throw new Error('Could not find form in the page')
     }
     
-    const formMethod = formMatch[1] ? formMatch[1].toUpperCase() : 'POST'
-    let formAction = formMatch[2] || 'https://teraboxdl.site/'
+    const formMethod = formMatch[1].toUpperCase()
+    let formAction = formMatch[2]
     
     // If formAction is relative, make it absolute
     if (!formAction.startsWith('http')) {
@@ -266,7 +215,7 @@ async function tryFormSubmissionMethod(teraboxUrl, password) {
       inputFields[inputMatch[1]] = inputMatch[2]
     }
     
-    // Override with our URL and password
+    // Override with our URL and password (like Playwright's page.fill)
     inputFields['url'] = teraboxUrl
     if (password) {
       inputFields['password'] = password
@@ -274,23 +223,8 @@ async function tryFormSubmissionMethod(teraboxUrl, password) {
     
     console.log('Form fields:', inputFields)
     
-    // Get cookies from initial response
-    const cookies = initialResponse.headers.get('set-cookie') || ''
-    console.log('Initial cookies:', cookies)
-    
-    // Submit the form
-    return await submitForm(formAction, formMethod, inputFields, teraboxUrl, password, cookies)
-    
-  } catch (error) {
-    console.error('Form method error:', error)
-    return { success: false, error: error.message }
-  }
-}
-
-async function submitForm(formAction, formMethod, inputFields, teraboxUrl, password, cookies) {
-  try {
+    // Step 4: Submit the form (like Playwright's click on "Fetch Files")
     let submitResponse
-    
     if (formMethod === 'POST') {
       const formData = new URLSearchParams()
       for (const [key, value] of Object.entries(inputFields)) {
@@ -342,7 +276,7 @@ async function submitForm(formAction, formMethod, inputFields, teraboxUrl, passw
     console.log('Submit response status:', submitResponse.status)
     
     if (!submitResponse.ok) {
-      return { success: false, error: `Form submission failed: ${submitResponse.status} ${submitResponse.statusText}` }
+      throw new Error(`Form submission failed: ${submitResponse.status} ${submitResponse.statusText}`)
     }
     
     const responseHtml = await submitResponse.text()
@@ -351,94 +285,30 @@ async function submitForm(formAction, formMethod, inputFields, teraboxUrl, passw
     // Save a sample of the response for debugging
     console.log('Response sample:', responseHtml.substring(0, 500))
     
-    // Parse the response to extract download links
-    const downloadLinks = extractSpecificDownloadLinks(responseHtml)
+    // Step 5: Extract download links (like Playwright's waitForSelector and click)
+    const downloadLinks = extractDownloadLinksFromResponse(responseHtml)
     
     if (downloadLinks.length > 0) {
-      return { success: true, links: downloadLinks }
+      console.log(`Found ${downloadLinks.length} download links`)
+      await sendDownloadLinks(chatId, downloadLinks)
     } else {
-      // If no specific links found, try the general extraction
-      const generalLinks = extractDownloadLinks(responseHtml)
-      if (generalLinks.length > 0) {
-        return { success: true, links: generalLinks }
-      } else {
-        return { success: false, error: 'No download links found in response' }
-      }
+      console.log('No download links found')
+      await sendMessage(chatId, "❌ No download links found. The link might be invalid or expired.")
     }
     
   } catch (error) {
-    console.error('Submit form error:', error)
-    return { success: false, error: error.message }
+    console.error('Error processing Terabox link:', error)
+    await sendMessage(chatId, `❌ Error: ${error.message}`)
   }
 }
 
-function extractSpecificDownloadLinks(html) {
+function extractDownloadLinksFromResponse(html) {
   const links = []
   
-  // Look for download links in specific patterns that indicate actual file downloads
-  // Pattern 1: Direct download links with file extensions
-  const directLinkRegex = /<a[^>]*href="([^"]+\.(?:mp4|mkv|avi|mp3|zip|rar|pdf|jpg|png|exe|doc|docx|xls|xlsx|ppt|pptx))"[^>]*>([^<]+)<\/a>/gi
+  // Method 1: Look for download buttons with direct links (like Playwright's waitForSelector)
+  const downloadButtonRegex = /<button[^>]*onclick="window\.open\('([^']+)'[^>]*>[\s\S]*?Download[\s\S]*?<\/button>/gi
   let match
-  while ((match = directLinkRegex.exec(html)) !== null) {
-    links.push({
-      name: match[2].trim(),
-      size: 'Unknown',
-      url: match[1]
-    })
-  }
-  
-  // Pattern 2: Download buttons with file names
-  const downloadButtonRegex = /<button[^>]*onclick="window\.open\('([^"]+\.(?:mp4|mkv|avi|mp3|zip|rar|pdf|jpg|png|exe|doc|docx|xls|xlsx|ppt|pptx))'[^>]*>([^<]+)<\/button>/gi
   while ((match = downloadButtonRegex.exec(html)) !== null) {
-    links.push({
-      name: match[2].trim(),
-      size: 'Unknown',
-      url: match[1]
-    })
-  }
-  
-  // Pattern 3: Look for file listings with download links
-  const fileListingRegex = /<div[^>]*class="[^"]*file[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?<\/div>/gi
-  while ((match = fileListingRegex.exec(html)) !== null) {
-    if (match[1].includes('download') || match[1].includes('terabox') || match[1].match(/\.(mp4|mkv|avi|mp3|zip|rar|pdf|jpg|png|exe|doc|docx|xls|xlsx|ppt|pptx)/i)) {
-      links.push({
-        name: match[2].trim(),
-        size: 'Unknown',
-        url: match[1]
-      })
-    }
-  }
-  
-  // Pattern 4: Look for JavaScript download links with file names
-  const jsDownloadRegex = /downloadFile\(['"]([^"]+)['"],\s*['"]([^"']+)['"]\)/gi
-  while ((match = jsDownloadRegex.exec(html)) !== null) {
-    links.push({
-      name: match[2],
-      size: 'Unknown',
-      url: match[1]
-    })
-  }
-  
-  // Remove duplicates
-  const uniqueLinks = []
-  const seenUrls = new Set()
-  links.forEach(link => {
-    if (!seenUrls.has(link.url)) {
-      seenUrls.add(link.url)
-      uniqueLinks.push(link)
-    }
-  })
-  
-  return uniqueLinks
-}
-
-function extractDownloadLinks(html) {
-  const links = []
-  
-  // Method 1: Look for download buttons with direct links
-  const buttonRegex = /<button[^>]*onclick="window\.open\('([^']+)'[^>]*>[\s\S]*?Download[\s\S]*?<\/button>/gi
-  let match
-  while ((match = buttonRegex.exec(html)) !== null) {
     // Only include if it looks like a file URL
     if (match[1].includes('download') || match[1].includes('file') || match[1].match(/\.(mp4|mkv|avi|mp3|zip|rar|pdf|jpg|png|exe)/i)) {
       links.push({
@@ -462,7 +332,7 @@ function extractDownloadLinks(html) {
     }
   }
   
-  // Method 3: Look for download URLs in JavaScript
+  // Method 3: Look for download URLs in JavaScript variables
   const jsRegex = /downloadUrl\s*=\s*['"]([^'"]+)['"]/gi
   while ((match = jsRegex.exec(html)) !== null) {
     links.push({
@@ -551,4 +421,4 @@ function fetchWithTimeout(url, options, timeout = 10000) {
       setTimeout(() => reject(new Error('Request timeout')), timeout)
     )
   ])
-      }
+        }
