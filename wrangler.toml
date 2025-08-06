@@ -1,0 +1,9 @@
+name = "terabox-bot"
+compatibility_date = "2025-08-06"
+main = "worker.js"
+
+[env.production]
+vars = { ENVIRONMENT = "production" }
+
+[env.staging]
+vars = { ENVIRONMENT = "staging" }
