@@ -114,16 +114,43 @@ async function checkServiceStatus() {
       }
     })
     
-    if (response.ok) {
-      const html = await response.text()
-      if (html.includes('Paste your Terabox URL here')) {
-        return `✅ Service Status: <b>Online</b>\nResponse time: ${response.headers.get('x-response-time') || 'N/A'}ms`
-      } else {
-        return `⚠️ Service Status: <b>Unstable</b>\nPage content changed`
-      }
-    } else {
+    if (!response.ok) {
       return `❌ Service Status: <b>Offline</b>\nError: ${response.status} ${response.statusText}`
     }
+    
+    const html = await response.text()
+    console.log('Status check HTML length:', html.length)
+    
+    // Check for multiple indicators that the service is working
+    const indicators = [
+      'Paste your Terabox URL here',  // Original indicator
+      'terabox',                      // General terabox reference
+      'download',                     // Download functionality
+      'url',                          // URL input field
+      'submit',                       // Submit button
+      'form',                         // Form element
+      'input',                        // Input fields
+      'button',                       // Buttons
+    ]
+    
+    let foundIndicators = 0
+    const foundList = []
+    indicators.forEach(indicator => {
+      if (html.toLowerCase().includes(indicator.toLowerCase())) {
+        foundIndicators++
+        foundList.push(indicator)
+      }
+    })
+    
+    // Check if we found enough indicators
+    if (foundIndicators >= 4) {
+      return `✅ Service Status: <b>Online</b>\nFound ${foundIndicators}/${indicators.length} indicators\nResponse time: ${response.headers.get('x-response-time') || 'N/A'}ms\n\nFound: ${foundList.join(', ')}`
+    } else if (foundIndicators >= 2) {
+      return `⚠️ Service Status: <b>Partially Working</b>\nFound ${foundIndicators}/${indicators.length} indicators\nPage structure may have changed\n\nFound: ${foundList.join(', ')}`
+    } else {
+      return `❌ Service Status: <b>Offline</b>\nFound ${foundIndicators}/${indicators.length} indicators\nPage may be completely different`
+    }
+    
   } catch (error) {
     return `❌ Service Status: <b>Error</b>\n${error.message}`
   }
@@ -133,7 +160,7 @@ async function processTeraboxLink(chatId, teraboxUrl, password) {
   try {
     console.log('Processing Terabox link with teraboxdl.site...')
     
-    // Step 1: Get initial page to establish session
+    // Step 1: Get initial page to find form endpoint
     const initialResponse = await fetch('https://teraboxdl.site/', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36',
@@ -149,49 +176,65 @@ async function processTeraboxLink(chatId, teraboxUrl, password) {
       throw new Error(`Failed to access teraboxdl.site: ${initialResponse.status}`)
     }
     
+    const html = await initialResponse.text()
+    console.log('Initial page loaded, length:', html.length)
+    
+    // Extract form action URL
+    const formActionMatch = html.match(/<form[^>]*action="([^"]*)"[^>]*>/i)
+    let formUrl = 'https://teraboxdl.site/'
+    if (formActionMatch && formActionMatch[1]) {
+      formUrl = formActionMatch[1].startsWith('http') ? formActionMatch[1] : `https://teraboxdl.site${formActionMatch[1]}`
+    }
+    console.log('Form action URL:', formUrl)
+    
+    // Extract CSRF token if present
+    let csrfToken = ''
+    const csrfMatch = html.match(/<input[^>]*name="csrf_token"[^>]*value="([^"]*)"[^>]*>/i)
+    if (csrfMatch && csrfMatch[1]) {
+      csrfToken = csrfMatch[1]
+      console.log('CSRF token found:', csrfToken)
+    }
+    
     // Get cookies from initial response
     const cookies = initialResponse.headers.get('set-cookie') || ''
     console.log('Initial cookies:', cookies)
     
     // Step 2: Submit the form with the Terabox URL
-    const formData = new FormData()
+    const formData = new URLSearchParams()
     formData.append('url', teraboxUrl)
     if (password) {
       formData.append('password', password)
     }
+    if (csrfToken) {
+      formData.append('csrf_token', csrfToken)
+    }
     
-    const submitResponse = await fetch('https://teraboxdl.site/', {
+    console.log('Submitting form to:', formUrl)
+    const submitResponse = await fetch(formUrl, {
       method: 'POST',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
         'Accept-Encoding': 'gzip, deflate, br',
+        'Content-Type': 'application/x-www-form-urlencoded',
         'Connection': 'keep-alive',
         'Cookie': cookies,
         'Referer': 'https://teraboxdl.site/',
         'Upgrade-Insecure-Requests': '1',
       },
-      body: formData
+      body: formData.toString()
     })
     
     if (!submitResponse.ok) {
-      throw new Error(`Form submission failed: ${submitResponse.status}`)
+      throw new Error(`Form submission failed: ${submitResponse.status} ${submitResponse.statusText}`)
     }
     
-    const html = await submitResponse.text()
-    console.log('Response HTML length:', html.length)
+    const responseHtml = await submitResponse.text()
+    console.log('Form response length:', responseHtml.length)
     
     // Step 3: Parse the response to extract download links
-    const downloadLinks = extractDownloadLinks(html)
-    
-    if (downloadLinks.length === 0) {
-      // Try alternative parsing method
-      const altLinks = extractAlternativeDownloadLinks(html)
-      if (altLinks.length > 0) {
-        downloadLinks.push(...altLinks)
-      }
-    }
+    const downloadLinks = extractDownloadLinks(responseHtml)
     
     if (downloadLinks.length === 0) {
       console.log('No download links found in response')
@@ -254,28 +297,24 @@ function extractDownloadLinks(html) {
     })
   }
   
-  return links
-}
-
-function extractAlternativeDownloadLinks(html) {
-  const links = []
-  
-  // Look for any URL that might be a download link
+  // Method 4: Look for any URL that might be a download link
   const urlRegex = /https?:\/\/[^"\s]+/gi
   const urls = html.match(urlRegex) || []
   
-  // Filter for likely download URLs
   urls.forEach(url => {
     if (url.includes('download') || 
         url.includes('terabox') || 
         url.includes('1024terabox') ||
         url.includes('file') ||
         url.match(/\.(mp4|mkv|avi|mp3|zip|rar|pdf|jpg|png|exe)$/i)) {
-      links.push({
-        name: `File ${links.length + 1}`,
-        size: 'Unknown',
-        url: url
-      })
+      // Check if this URL is already in our links
+      if (!links.some(link => link.url === url)) {
+        links.push({
+          name: `File ${links.length + 1}`,
+          size: 'Unknown',
+          url: url
+        })
+      }
     }
   })
   
@@ -313,15 +352,4 @@ function escapeHtml(text) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
-}
-
-// Helper function for fetch with timeout
-function fetchWithTimeout(url, options, timeout = 10000) {
-  console.log(`Fetching ${url} with timeout ${timeout}ms`)
-  return Promise.race([
-    fetch(url, options),
-    new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Request timeout')), timeout)
-    )
-  ])
 }
