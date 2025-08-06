@@ -160,7 +160,7 @@ async function processTeraboxLink(chatId, teraboxUrl, password) {
   try {
     console.log('Processing Terabox link with teraboxdl.site...')
     
-    // We'll focus on the form submission method
+    // Try to find the correct form endpoint and method
     const result = await tryFormSubmissionMethod(teraboxUrl, password)
     
     if (result.success) {
@@ -199,54 +199,92 @@ async function tryFormSubmissionMethod(teraboxUrl, password) {
     const html = await initialResponse.text()
     console.log('Initial page loaded, length:', html.length)
     
-    // Extract form action URL
-    const formActionMatch = html.match(/<form[^>]*action="([^"]*)"[^>]*>/i)
-    let formUrl = 'https://teraboxdl.site/'
-    if (formActionMatch && formActionMatch[1]) {
-      formUrl = formActionMatch[1].startsWith('http') ? formActionMatch[1] : `https://teraboxdl.site${formActionMatch[1]}`
+    // Extract form details more carefully
+    const formMatch = html.match(/<form[^>]*method="([^"]*)"[^>]*action="([^"]*)"[^>]*>/i)
+    if (!formMatch) {
+      return { success: false, error: 'Could not find form in the page' }
     }
-    console.log('Form action URL:', formUrl)
     
-    // Extract CSRF token if present
-    let csrfToken = ''
-    const csrfMatch = html.match(/<input[^>]*name="csrf_token"[^>]*value="([^"]*)"[^>]*>/i)
-    if (csrfMatch && csrfMatch[1]) {
-      csrfToken = csrfMatch[1]
-      console.log('CSRF token found:', csrfToken)
+    const formMethod = formMatch[1].toUpperCase()
+    let formAction = formMatch[2]
+    
+    // If formAction is relative, make it absolute
+    if (!formAction.startsWith('http')) {
+      formAction = new URL(formAction, 'https://teraboxdl.site/').toString()
     }
+    
+    console.log('Form method:', formMethod)
+    console.log('Form action:', formAction)
+    
+    // Extract all input fields from the form
+    const inputFields = {}
+    const inputRegex = /<input[^>]*name="([^"]*)"[^>]*value="([^"]*)"[^>]*>/gi
+    let inputMatch
+    while ((inputMatch = inputRegex.exec(html)) !== null) {
+      inputFields[inputMatch[1]] = inputMatch[2]
+    }
+    
+    // Override with our URL and password
+    inputFields['url'] = teraboxUrl
+    if (password) {
+      inputFields['password'] = password
+    }
+    
+    console.log('Form fields:', inputFields)
     
     // Get cookies from initial response
     const cookies = initialResponse.headers.get('set-cookie') || ''
     console.log('Initial cookies:', cookies)
     
-    // Step 2: Submit the form with the Terabox URL
-    const formData = new URLSearchParams()
-    formData.append('url', teraboxUrl)
-    if (password) {
-      formData.append('password', password)
+    // Step 2: Submit the form
+    let submitResponse
+    if (formMethod === 'POST') {
+      const formData = new URLSearchParams()
+      for (const [key, value] of Object.entries(inputFields)) {
+        formData.append(key, value)
+      }
+      
+      console.log('Submitting form via POST to:', formAction)
+      console.log('Form data:', formData.toString())
+      
+      submitResponse = await fetchWithTimeout(formAction, {
+        method: 'POST',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Connection': 'keep-alive',
+          'Cookie': cookies,
+          'Referer': 'https://teraboxdl.site/',
+          'Upgrade-Insecure-Requests': '1',
+        },
+        body: formData.toString()
+      }, 20000)
+    } else {
+      // GET method
+      const url = new URL(formAction)
+      for (const [key, value] of Object.entries(inputFields)) {
+        url.searchParams.append(key, value)
+      }
+      
+      console.log('Submitting form via GET to:', url.toString())
+      
+      submitResponse = await fetchWithTimeout(url.toString(), {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+          'Cookie': cookies,
+          'Referer': 'https://teraboxdl.site/',
+          'Upgrade-Insecure-Requests': '1',
+        },
+      }, 20000)
     }
-    if (csrfToken) {
-      formData.append('csrf_token', csrfToken)
-    }
-    
-    console.log('Submitting form to:', formUrl)
-    console.log('Form data:', formData.toString())
-    
-    const submitResponse = await fetchWithTimeout(formUrl, {
-      method: 'POST',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Connection': 'keep-alive',
-        'Cookie': cookies,
-        'Referer': 'https://teraboxdl.site/',
-        'Upgrade-Insecure-Requests': '1',
-      },
-      body: formData.toString()
-    }, 20000) // Increased timeout for form processing
     
     console.log('Submit response status:', submitResponse.status)
     
@@ -460,4 +498,4 @@ function fetchWithTimeout(url, options, timeout = 10000) {
       setTimeout(() => reject(new Error('Request timeout')), timeout)
     )
   ])
-      }
+          }
