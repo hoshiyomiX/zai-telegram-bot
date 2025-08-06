@@ -199,14 +199,56 @@ async function tryFormSubmissionMethod(teraboxUrl, password) {
     const html = await initialResponse.text()
     console.log('Initial page loaded, length:', html.length)
     
-    // Extract form details more carefully
-    const formMatch = html.match(/<form[^>]*method="([^"]*)"[^>]*action="([^"]*)"[^>]*>/i)
+    // Log a sample of the HTML for debugging
+    console.log('HTML sample:', html.substring(0, 1000))
+    
+    // Try multiple approaches to find the form
+    
+    // Approach 1: Look for a form with method and action
+    let formMatch = html.match(/<form[^>]*method="([^"]*)"[^>]*action="([^"]*)"[^>]*>/i)
     if (!formMatch) {
-      return { success: false, error: 'Could not find form in the page' }
+      // Approach 2: Look for any form tag
+      formMatch = html.match(/<form[^>]*action="([^"]*)"[^>]*>/i)
+      if (formMatch) {
+        // Default to POST if method not specified
+        formMatch = ['', 'POST', formMatch[1]]
+      } else {
+        // Approach 3: Look for form without action
+        formMatch = html.match(/<form[^>]*>/i)
+        if (formMatch) {
+          // Default to POST and current URL
+          formMatch = ['', 'POST', 'https://teraboxdl.site/']
+        }
+      }
     }
     
-    const formMethod = formMatch[1].toUpperCase()
-    let formAction = formMatch[2]
+    if (!formMatch) {
+      // If no form found, try to find input fields and submit button
+      console.log('No form found, looking for input fields and submit button')
+      
+      // Look for input fields
+      const inputFields = {}
+      const inputRegex = /<input[^>]*name="([^"]*)"[^>]*value="([^"]*)"[^>]*>/gi
+      let inputMatch
+      while ((inputMatch = inputRegex.exec(html)) !== null) {
+        inputFields[inputMatch[1]] = inputMatch[2]
+      }
+      
+      // Look for submit button
+      const submitMatch = html.match(/<button[^>]*type="submit"[^>]*name="([^"]*)"[^>]*>/i) ||
+                         html.match(/<input[^>]*type="submit"[^>]*name="([^"]*)"[^>]*>/i)
+      
+      if (Object.keys(inputFields).length > 0) {
+        // We found input fields, assume we can submit to the same URL
+        console.log('Found input fields but no form, will submit to root')
+        return await submitForm('https://teraboxdl.site/', 'POST', inputFields, teraboxUrl, password, initialResponse.headers.get('set-cookie') || '')
+      } else {
+        return { success: false, error: 'Could not find form or input fields in the page' }
+      }
+    }
+    
+    const formMethod = formMatch[1] ? formMatch[1].toUpperCase() : 'POST'
+    let formAction = formMatch[2] || 'https://teraboxdl.site/'
     
     // If formAction is relative, make it absolute
     if (!formAction.startsWith('http')) {
@@ -236,8 +278,19 @@ async function tryFormSubmissionMethod(teraboxUrl, password) {
     const cookies = initialResponse.headers.get('set-cookie') || ''
     console.log('Initial cookies:', cookies)
     
-    // Step 2: Submit the form
+    // Submit the form
+    return await submitForm(formAction, formMethod, inputFields, teraboxUrl, password, cookies)
+    
+  } catch (error) {
+    console.error('Form method error:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+async function submitForm(formAction, formMethod, inputFields, teraboxUrl, password, cookies) {
+  try {
     let submitResponse
+    
     if (formMethod === 'POST') {
       const formData = new URLSearchParams()
       for (const [key, value] of Object.entries(inputFields)) {
@@ -298,7 +351,7 @@ async function tryFormSubmissionMethod(teraboxUrl, password) {
     // Save a sample of the response for debugging
     console.log('Response sample:', responseHtml.substring(0, 500))
     
-    // Step 3: Parse the response to extract download links
+    // Parse the response to extract download links
     const downloadLinks = extractSpecificDownloadLinks(responseHtml)
     
     if (downloadLinks.length > 0) {
@@ -314,7 +367,7 @@ async function tryFormSubmissionMethod(teraboxUrl, password) {
     }
     
   } catch (error) {
-    console.error('Form method error:', error)
+    console.error('Submit form error:', error)
     return { success: false, error: error.message }
   }
 }
@@ -498,4 +551,4 @@ function fetchWithTimeout(url, options, timeout = 10000) {
       setTimeout(() => reject(new Error('Request timeout')), timeout)
     )
   ])
-          }
+      }
