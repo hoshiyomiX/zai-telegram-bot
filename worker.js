@@ -39,13 +39,14 @@ async function handleUpdate(update) {
   try {
     console.log('Processing update:', JSON.stringify(update))
     
+    // Check if update has message
     if (!update.message) {
       console.log('No message in update')
       return
     }
     
     const chatId = update.message.chat.id
-    const text = update.message.text
+    const text = update.message.text || '' // Default to empty string if text is undefined
     
     console.log(`Message from ${chatId}: ${text}`)
     
@@ -77,8 +78,8 @@ async function handleUpdate(update) {
       return
     }
     
-    // Extract Terabox link
-    const linkMatch = text.match(/https:\/\/(?:www\.)?(?:terabox|1024terabox)\.com\/s\/([^\s]+)/)
+    // Extract Terabox link - with null check
+    const linkMatch = text ? text.match(/https:\/\/(?:www\.)?(?:terabox|1024terabox)\.com\/s\/([^\s]+)/) : null
     if (!linkMatch) {
       console.log('No Terabox link found in message')
       await sendMessage(chatId, 
@@ -136,7 +137,7 @@ async function checkServiceStatus() {
     let foundIndicators = 0
     const foundList = []
     indicators.forEach(indicator => {
-      if (html.toLowerCase().includes(indicator.toLowerCase())) {
+      if (html && html.toLowerCase().includes(indicator.toLowerCase())) {
         foundIndicators++
         foundList.push(indicator)
       }
@@ -180,7 +181,7 @@ async function processTeraboxLink(chatId, teraboxUrl, password) {
     console.log('Initial page loaded, length:', html.length)
     
     // Log a sample of the HTML for debugging
-    console.log('HTML sample:', html.substring(0, 1000))
+    console.log('HTML sample:', html ? html.substring(0, 1000) : 'No HTML content')
     
     // Get cookies from initial response (like Playwright's context)
     const cookies = initialResponse.headers.get('set-cookie') || ''
@@ -188,7 +189,7 @@ async function processTeraboxLink(chatId, teraboxUrl, password) {
     
     // Step 2: Handle cookie popup (like Playwright's acceptBtn.click())
     // Since we can't click, we'll just note that we would handle it
-    if (html.includes('Accept All')) {
+    if (html && html.includes('Accept All')) {
       console.log('Cookie popup detected, would accept in browser')
     }
     
@@ -215,7 +216,7 @@ async function processTeraboxLink(chatId, teraboxUrl, password) {
     
     // Step 4: Submit the form (like Playwright's click on "Fetch Files")
     let submitResponse
-    if (formInfo.method.toUpperCase() === 'POST') {
+    if (formInfo.method && formInfo.method.toUpperCase() === 'POST') {
       const formData = new URLSearchParams()
       for (const [key, value] of Object.entries(inputFields)) {
         formData.append(key, value)
@@ -241,7 +242,7 @@ async function processTeraboxLink(chatId, teraboxUrl, password) {
       }, 20000)
     } else {
       // GET method
-      const url = new URL(formInfo.action)
+      const url = new URL(formInfo.action || 'https://teraboxdl.site/')
       for (const [key, value] of Object.entries(inputFields)) {
         url.searchParams.append(key, value)
       }
@@ -273,7 +274,7 @@ async function processTeraboxLink(chatId, teraboxUrl, password) {
     console.log('Response length:', responseHtml.length)
     
     // Save a sample of the response for debugging
-    console.log('Response sample:', responseHtml.substring(0, 500))
+    console.log('Response sample:', responseHtml ? responseHtml.substring(0, 500) : 'No response content')
     
     // Step 5: Extract download links (like Playwright's waitForSelector and click)
     const downloadLinks = extractDownloadLinksFromResponse(responseHtml)
@@ -293,6 +294,9 @@ async function processTeraboxLink(chatId, teraboxUrl, password) {
 }
 
 function extractFormInfo(html) {
+  // Add null check
+  if (!html) return null
+  
   // Try multiple patterns to find the form
   
   // Pattern 1: Standard form with method and action
@@ -339,6 +343,9 @@ function extractFormInfo(html) {
 }
 
 function extractInputFields(html) {
+  // Add null check
+  if (!html) return {}
+  
   const fields = {}
   
   // Extract all input fields with name and value
@@ -360,6 +367,9 @@ function extractInputFields(html) {
 }
 
 function extractDownloadLinksFromResponse(html) {
+  // Add null check
+  if (!html) return []
+  
   const links = []
   
   // Method 1: Look for download buttons with direct links (like Playwright's waitForSelector)
@@ -367,7 +377,7 @@ function extractDownloadLinksFromResponse(html) {
   let match
   while ((match = downloadButtonRegex.exec(html)) !== null) {
     // Only include if it looks like a file URL
-    if (match[1].includes('download') || match[1].includes('file') || match[1].match(/\.(mp4|mkv|avi|mp3|zip|rar|pdf|jpg|png|exe)/i)) {
+    if (match[1] && (match[1].includes('download') || match[1].includes('file') || match[1].match(/\.(mp4|mkv|avi|mp3|zip|rar|pdf|jpg|png|exe)/i))) {
       links.push({
         name: `File ${links.length + 1}`,
         size: 'Unknown',
@@ -379,7 +389,7 @@ function extractDownloadLinksFromResponse(html) {
   // Method 2: Look for direct download links
   const linkRegex = /<a[^>]*href="([^"]+)"[^>]*>[\s\S]*?Download[\s\S]*?<\/a>/gi
   while ((match = linkRegex.exec(html)) !== null) {
-    if (!match[1].includes('javascript:') && !match[1].includes('#') && 
+    if (match[1] && !match[1].includes('javascript:') && !match[1].includes('#') && 
         (match[1].includes('download') || match[1].includes('file') || match[1].match(/\.(mp4|mkv|avi|mp3|zip|rar|pdf|jpg|png|exe)/i))) {
       links.push({
         name: `File ${links.length + 1}`,
@@ -392,11 +402,13 @@ function extractDownloadLinksFromResponse(html) {
   // Method 3: Look for download URLs in JavaScript variables
   const jsRegex = /downloadUrl\s*=\s*['"]([^'"]+)['"]/gi
   while ((match = jsRegex.exec(html)) !== null) {
-    links.push({
-      name: `File ${links.length + 1}`,
-      size: 'Unknown',
-      url: match[1]
-    })
+    if (match[1]) {
+      links.push({
+        name: `File ${links.length + 1}`,
+        size: 'Unknown',
+        url: match[1]
+      })
+    }
   }
   
   // Method 4: Look for any URL that might be a download link
@@ -404,7 +416,7 @@ function extractDownloadLinksFromResponse(html) {
   const urls = html.match(urlRegex) || []
   
   urls.forEach(url => {
-    if ((url.includes('download') || 
+    if (url && (url.includes('download') || 
          url.includes('terabox') || 
          url.includes('1024terabox') ||
          url.includes('file') ||
@@ -463,6 +475,9 @@ async function sendMessage(chatId, text) {
 }
 
 function escapeHtml(text) {
+  // Add null check
+  if (!text) return ''
+  
   return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -478,4 +493,4 @@ function fetchWithTimeout(url, options, timeout = 10000) {
       setTimeout(() => reject(new Error('Request timeout')), timeout)
     )
   ])
-  }
+      }
