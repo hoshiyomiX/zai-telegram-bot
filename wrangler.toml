@@ -2,5 +2,5 @@ name = "terabox-bot"
 compatibility_date = "2025-08-06"
 main = "worker.js"
 
-[env.production]
-vars = { TELEGRAM_BOT_TOKEN = "8340518005:AAHptnQ77rP-_slKfMZNrVdVxkkFwjd2-tU" }
+[vars]
+TELEGRAM_BOT_TOKEN = "8340518005:AAHptnQ77rP-_slKfMZNrVdVxkkFwjd2-tU"
