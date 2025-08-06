@@ -3,12 +3,24 @@ addEventListener('fetch', event => {
 })
 
 async function handleRequest(request) {
-  if (request.method === 'POST') {
-    const update = await request.json()
-    await handleUpdate(update)
-    return new Response('OK')
+  // Handle GET requests (for webhook verification)
+  if (request.method === 'GET') {
+    return new Response('Terabox Bot is running!')
   }
-  return new Response('Terabox Bot is running!')
+  
+  // Handle POST requests (for Telegram updates)
+  if (request.method === 'POST') {
+    try {
+      const update = await request.json()
+      await handleUpdate(update)
+      return new Response('OK')
+    } catch (error) {
+      console.error('Error processing update:', error)
+      return new Response('Error processing update', { status: 500 })
+    }
+  }
+  
+  return new Response('Method not allowed', { status: 405 })
 }
 
 async function handleUpdate(update) {
@@ -17,9 +29,9 @@ async function handleUpdate(update) {
   const chatId = update.message.chat.id
   const text = update.message.text
   
-  // Handle commands
+  // Handle /start command
   if (text === '/start') {
-    return sendMessage(chatId, 
+    await sendMessage(chatId, 
       `📦 *Terabox Link Bot*\\n\\n` +
       `Send me a Terabox share link to get direct download links\\.\\n\\n` +
       `Example:\\n` +
@@ -27,12 +39,14 @@ async function handleUpdate(update) {
       `For password\\-protected files:\\n` +
       `https://terabox\\.com/s/xxxxx your_password`
     )
+    return
   }
   
   // Extract Terabox link
   const linkMatch = text.match(/https:\/\/terabox\.com\/s\/([^\s]+)/)
   if (!linkMatch) {
-    return sendMessage(chatId, "❌ Please send a valid Terabox share link")
+    await sendMessage(chatId, "❌ Please send a valid Terabox share link")
+    return
   }
   
   const shorturl = linkMatch[1]
@@ -50,42 +64,57 @@ async function handleUpdate(update) {
       }
     )
     
+    if (!infoResponse.ok) {
+      throw new Error(`HTTP error! status: ${infoResponse.status}`)
+    }
+    
     const infoData = await infoResponse.json()
     
     if (!infoData.ok) {
-      return sendMessage(chatId, "❌ Invalid link or password")
+      await sendMessage(chatId, "❌ Invalid link or password")
+      return
     }
     
     // Get download links
     const links = []
     for (const file of infoData.list) {
-      const dlResponse = await fetch('https://terabox.hnn.workers.dev/api/get-download', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Origin': 'https://terabox.hnn.workers.dev'
-        },
-        body: JSON.stringify({
-          shareid: infoData.shareid,
-          uk: infoData.uk,
-          sign: infoData.sign,
-          timestamp: infoData.timestamp,
-          fs_id: file.fs_id
+      try {
+        const dlResponse = await fetch('https://terabox.hnn.workers.dev/api/get-download', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Origin': 'https://terabox.hnn.workers.dev'
+          },
+          body: JSON.stringify({
+            shareid: infoData.shareid,
+            uk: infoData.uk,
+            sign: infoData.sign,
+            timestamp: infoData.timestamp,
+            fs_id: file.fs_id
+          })
         })
-      })
-      
-      const dlData = await dlResponse.json()
-      if (dlData.downloadLink) {
-        links.push({
-          name: file.filename,
-          size: (file.size / (1024 * 1024)).toFixed(2),
-          url: dlData.downloadLink
-        })
+        
+        if (!dlResponse.ok) {
+          throw new Error(`HTTP error! status: ${dlResponse.status}`)
+        }
+        
+        const dlData = await dlResponse.json()
+        if (dlData.downloadLink) {
+          links.push({
+            name: file.filename,
+            size: (file.size / (1024 * 1024)).toFixed(2),
+            url: dlData.downloadLink
+          })
+        }
+      } catch (error) {
+        console.error('Error getting download link:', error)
+        continue
       }
     }
     
     if (links.length === 0) {
-      return sendMessage(chatId, "❌ No download links found")
+      await sendMessage(chatId, "❌ No download links found")
+      return
     }
     
     // Format response
@@ -96,27 +125,36 @@ async function handleUpdate(update) {
       response += `[Download](${file.url})\\n\\n`
     })
     
-    sendMessage(chatId, response)
+    await sendMessage(chatId, response)
   } catch (error) {
-    console.error(error)
-    sendMessage(chatId, "❌ Error processing your request")
+    console.error('Error processing Terabox link:', error)
+    await sendMessage(chatId, "❌ Error processing your request")
   }
 }
 
 async function sendMessage(chatId, text) {
-  const token = TELEGRAM_BOT_TOKEN // Set this in worker env variables
-  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: text,
-      parse_mode: 'MarkdownV2',
-      disable_web_page_preview: true
+  try {
+    const token = TELEGRAM_BOT_TOKEN // Set this in worker env variables
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: text,
+        parse_mode: 'MarkdownV2',
+        disable_web_page_preview: true
+      })
     })
-  })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Error sending message:', errorText)
+    }
+  } catch (error) {
+    console.error('Error in sendMessage:', error)
+  }
 }
 
 function escapeMarkdown(text) {
   return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&')
-                }
+}
