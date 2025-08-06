@@ -55,6 +55,10 @@ async function handleUpdate(update) {
       await sendMessage(chatId, 
         `📦 <b>Terabox Link Bot</b>\n\n` +
         `Send me a Terabox share link to get direct download links.\n\n` +
+        `Supported domains:\n` +
+        `• terabox.com\n` +
+        `• 1024terabox.com\n` +
+        `• www.terabox.com\n\n` +
         `Example:\n` +
         `https://terabox.com/s/xxxxx\n\n` +
         `For password-protected files:\n` +
@@ -63,11 +67,17 @@ async function handleUpdate(update) {
       return
     }
     
-    // Extract Terabox link
-    const linkMatch = text.match(/https:\/\/terabox\.com\/s\/([^\s]+)/)
+    // Extract Terabox link - updated to match multiple domains
+    const linkMatch = text.match(/https:\/\/(?:www\.)?(?:terabox|1024terabox)\.com\/s\/([^\s]+)/)
     if (!linkMatch) {
       console.log('No Terabox link found in message')
-      await sendMessage(chatId, "❌ Please send a valid Terabox share link")
+      await sendMessage(chatId, 
+        `❌ Please send a valid Terabox share link\n\n` +
+        `Supported domains:\n` +
+        `• terabox.com\n` +
+        `• 1024terabox.com\n` +
+        `• www.terabox.com`
+      )
       return
     }
     
@@ -89,6 +99,8 @@ async function handleUpdate(update) {
 async function processTeraboxLink(chatId, shorturl, password) {
   try {
     console.log('Getting file info...')
+    console.log(`API URL: https://terabox.hnn.workers.dev/api/get-info?shorturl=${shorturl}&pwd=${encodeURIComponent(password)}`)
+    
     // Get file info with timeout
     const infoResponse = await fetchWithTimeout(
       `https://terabox.hnn.workers.dev/api/get-info?shorturl=${shorturl}&pwd=${encodeURIComponent(password)}`,
@@ -98,18 +110,29 @@ async function processTeraboxLink(chatId, shorturl, password) {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
         }
       },
-      10000 // 10 second timeout
+      15000 // Increased timeout to 15 seconds
     )
     
+    console.log(`Info response status: ${infoResponse.status}`)
+    
     if (!infoResponse.ok) {
-      throw new Error(`HTTP error! status: ${infoResponse.status}`)
+      const errorText = await infoResponse.text()
+      console.error(`HTTP error: ${infoResponse.status}, Response: ${errorText}`)
+      throw new Error(`HTTP error: ${infoResponse.status}`)
     }
     
     const infoData = await infoResponse.json()
     console.log('File info received:', JSON.stringify(infoData))
     
     if (!infoData.ok) {
+      console.error('API returned ok: false')
       await sendMessage(chatId, "❌ Invalid link or password")
+      return
+    }
+    
+    if (!infoData.list || infoData.list.length === 0) {
+      console.error('No files found in the response')
+      await sendMessage(chatId, "❌ No files found in this share")
       return
     }
     
@@ -117,6 +140,7 @@ async function processTeraboxLink(chatId, shorturl, password) {
     console.log('Getting download links...')
     const downloadPromises = infoData.list.map(async (file) => {
       try {
+        console.log(`Processing file: ${file.filename}`)
         const dlResponse = await fetchWithTimeout(
           'https://terabox.hnn.workers.dev/api/get-download',
           {
@@ -133,14 +157,20 @@ async function processTeraboxLink(chatId, shorturl, password) {
               fs_id: file.fs_id
             })
           },
-          10000 // 10 second timeout
+          15000 // Increased timeout to 15 seconds
         )
         
+        console.log(`Download response status for ${file.filename}: ${dlResponse.status}`)
+        
         if (!dlResponse.ok) {
-          throw new Error(`HTTP error! status: ${dlResponse.status}`)
+          const errorText = await dlResponse.text()
+          console.error(`Download HTTP error for ${file.filename}: ${dlResponse.status}, Response: ${errorText}`)
+          throw new Error(`HTTP error: ${dlResponse.status}`)
         }
         
         const dlData = await dlResponse.json()
+        console.log(`Download data for ${file.filename}:`, JSON.stringify(dlData))
+        
         if (dlData.downloadLink) {
           return {
             name: file.filename,
@@ -149,7 +179,7 @@ async function processTeraboxLink(chatId, shorturl, password) {
           }
         }
       } catch (error) {
-        console.error('Error getting download link:', error)
+        console.error(`Error getting download link for file:`, error)
         return null
       }
     })
@@ -177,13 +207,13 @@ async function processTeraboxLink(chatId, shorturl, password) {
     await sendMessage(chatId, response)
   } catch (error) {
     console.error('Error processing Terabox link:', error)
-    await sendMessage(chatId, "❌ Error processing your request. Please try again later.")
+    await sendMessage(chatId, `❌ Error: ${error.message}`)
   }
 }
 
 async function sendMessage(chatId, text) {
   try {
-    console.log(`Sending message to ${chatId}`)
+    console.log(`Sending message to ${chatId}: ${text.substring(0, 100)}...`)
     const token = TELEGRAM_BOT_TOKEN
     const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
@@ -223,4 +253,4 @@ function fetchWithTimeout(url, options, timeout = 10000) {
       setTimeout(() => reject(new Error('Request timeout')), timeout)
     )
   ])
-              }
+      }
