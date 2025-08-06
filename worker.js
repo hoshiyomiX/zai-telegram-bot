@@ -53,12 +53,12 @@ async function handleUpdate(update) {
     if (text === '/start') {
       console.log('Handling /start command')
       await sendMessage(chatId, 
-        `📦 *Terabox Link Bot*\\n\\n` +
-        `Send me a Terabox share link to get direct download links\\.\\n\\n` +
-        `Example:\\n` +
-        `https://terabox\\.com/s/xxxxx\\n\\n` +
-        `For password\\-protected files:\\n` +
-        `https://terabox\\.com/s/xxxxx your_password`
+        `📦 <b>Terabox Link Bot</b>\n\n` +
+        `Send me a Terabox share link to get direct download links.\n\n` +
+        `Example:\n` +
+        `https://terabox.com/s/xxxxx\n\n` +
+        `For password-protected files:\n` +
+        `https://terabox.com/s/xxxxx your_password`
       )
       return
     }
@@ -166,11 +166,11 @@ async function processTeraboxLink(chatId, shorturl, password) {
     }
     
     // Format response
-    let response = `✅ Found ${links.length} file(s):\\n\\n`
+    let response = `✅ Found ${links.length} file(s):\n\n`
     links.forEach((file, i) => {
-      response += `*File ${i+1}:* ${escapeMarkdown(file.name)}\\n`
-      response += `*Size:* ${file.size} MB\\n`
-      response += `[Download](${file.url})\\n\\n`
+      response += `<b>File ${i+1}:</b> ${escapeHtml(file.name)}\n`
+      response += `<b>Size:</b> ${file.size} MB\n`
+      response += `<a href="${file.url}">Download</a>\n\n`
     })
     
     console.log('Sending response to user')
@@ -191,7 +191,7 @@ async function sendMessage(chatId, text) {
       body: JSON.stringify({
         chat_id: chatId,
         text: text,
-        parse_mode: 'MarkdownV2',
+        parse_mode: 'HTML',
         disable_web_page_preview: true
       })
     })
@@ -207,8 +207,11 @@ async function sendMessage(chatId, text) {
   }
 }
 
-function escapeMarkdown(text) {
-  return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&')
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 // Helper function for fetch with timeout
@@ -220,4 +223,4 @@ function fetchWithTimeout(url, options, timeout = 10000) {
       setTimeout(() => reject(new Error('Request timeout')), timeout)
     )
   ])
-}
+              }
