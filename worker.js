@@ -160,28 +160,16 @@ async function processTeraboxLink(chatId, teraboxUrl, password) {
   try {
     console.log('Processing Terabox link with teraboxdl.site...')
     
-    // Try the direct URL method first (alternative to form submission)
-    console.log('Trying direct URL method...')
-    const directResult = await tryDirectUrlMethod(teraboxUrl, password)
-    if (directResult.success) {
-      console.log('Direct URL method succeeded')
-      await sendDownloadLinks(chatId, directResult.links)
-      return
-    }
-    console.log('Direct URL method failed:', directResult.error)
+    // We'll focus on the form submission method
+    const result = await tryFormSubmissionMethod(teraboxUrl, password)
     
-    // If direct method fails, try form submission
-    console.log('Trying form submission method...')
-    const formResult = await tryFormSubmissionMethod(teraboxUrl, password)
-    if (formResult.success) {
-      console.log('Form submission method succeeded')
-      await sendDownloadLinks(chatId, formResult.links)
-      return
+    if (result.success) {
+      console.log('Successfully processed Terabox link')
+      await sendDownloadLinks(chatId, result.links)
+    } else {
+      console.log('Failed to process Terabox link:', result.error)
+      await sendMessage(chatId, `❌ Failed to process link: ${result.error}`)
     }
-    console.log('Form submission method failed:', formResult.error)
-    
-    // If both methods fail
-    await sendMessage(chatId, `❌ Failed to process link. Both methods failed:\n\nDirect URL: ${directResult.error}\nForm submission: ${formResult.error}`)
     
   } catch (error) {
     console.error('Error processing Terabox link:', error)
@@ -189,55 +177,10 @@ async function processTeraboxLink(chatId, teraboxUrl, password) {
   }
 }
 
-async function tryDirectUrlMethod(teraboxUrl, password) {
-  try {
-    // Try accessing the download page with URL as query parameter
-    const url = new URL('https://teraboxdl.site/')
-    url.searchParams.append('url', teraboxUrl)
-    if (password) {
-      url.searchParams.append('password', password)
-    }
-    
-    console.log('Direct URL method - Requesting:', url.toString())
-    
-    const response = await fetchWithTimeout(url.toString(), {
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-      }
-    }, 15000)
-    
-    console.log('Direct URL method - Response status:', response.status)
-    
-    if (!response.ok) {
-      return { success: false, error: `HTTP ${response.status} ${response.statusText}` }
-    }
-    
-    const html = await response.text()
-    console.log('Direct URL method - Response length:', html.length)
-    
-    const links = extractDownloadLinks(html)
-    if (links.length > 0) {
-      return { success: true, links: links }
-    } else {
-      return { success: false, error: 'No download links found' }
-    }
-    
-  } catch (error) {
-    console.error('Direct URL method error:', error)
-    return { success: false, error: error.message }
-  }
-}
-
 async function tryFormSubmissionMethod(teraboxUrl, password) {
   try {
     // Step 1: Get initial page to find form endpoint
-    console.log('Form method - Getting initial page...')
+    console.log('Getting initial page...')
     const initialResponse = await fetchWithTimeout('https://teraboxdl.site/', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36',
@@ -254,7 +197,7 @@ async function tryFormSubmissionMethod(teraboxUrl, password) {
     }
     
     const html = await initialResponse.text()
-    console.log('Form method - Initial page loaded, length:', html.length)
+    console.log('Initial page loaded, length:', html.length)
     
     // Extract form action URL
     const formActionMatch = html.match(/<form[^>]*action="([^"]*)"[^>]*>/i)
@@ -262,19 +205,19 @@ async function tryFormSubmissionMethod(teraboxUrl, password) {
     if (formActionMatch && formActionMatch[1]) {
       formUrl = formActionMatch[1].startsWith('http') ? formActionMatch[1] : `https://teraboxdl.site${formActionMatch[1]}`
     }
-    console.log('Form method - Form action URL:', formUrl)
+    console.log('Form action URL:', formUrl)
     
     // Extract CSRF token if present
     let csrfToken = ''
     const csrfMatch = html.match(/<input[^>]*name="csrf_token"[^>]*value="([^"]*)"[^>]*>/i)
     if (csrfMatch && csrfMatch[1]) {
       csrfToken = csrfMatch[1]
-      console.log('Form method - CSRF token found:', csrfToken)
+      console.log('CSRF token found:', csrfToken)
     }
     
     // Get cookies from initial response
     const cookies = initialResponse.headers.get('set-cookie') || ''
-    console.log('Form method - Initial cookies:', cookies)
+    console.log('Initial cookies:', cookies)
     
     // Step 2: Submit the form with the Terabox URL
     const formData = new URLSearchParams()
@@ -286,7 +229,9 @@ async function tryFormSubmissionMethod(teraboxUrl, password) {
       formData.append('csrf_token', csrfToken)
     }
     
-    console.log('Form method - Submitting form to:', formUrl)
+    console.log('Submitting form to:', formUrl)
+    console.log('Form data:', formData.toString())
+    
     const submitResponse = await fetchWithTimeout(formUrl, {
       method: 'POST',
       headers: {
@@ -301,23 +246,33 @@ async function tryFormSubmissionMethod(teraboxUrl, password) {
         'Upgrade-Insecure-Requests': '1',
       },
       body: formData.toString()
-    }, 15000)
+    }, 20000) // Increased timeout for form processing
     
-    console.log('Form method - Submit response status:', submitResponse.status)
+    console.log('Submit response status:', submitResponse.status)
     
     if (!submitResponse.ok) {
       return { success: false, error: `Form submission failed: ${submitResponse.status} ${submitResponse.statusText}` }
     }
     
     const responseHtml = await submitResponse.text()
-    console.log('Form method - Response length:', responseHtml.length)
+    console.log('Response length:', responseHtml.length)
+    
+    // Save a sample of the response for debugging
+    console.log('Response sample:', responseHtml.substring(0, 500))
     
     // Step 3: Parse the response to extract download links
-    const downloadLinks = extractDownloadLinks(responseHtml)
+    const downloadLinks = extractSpecificDownloadLinks(responseHtml)
+    
     if (downloadLinks.length > 0) {
       return { success: true, links: downloadLinks }
     } else {
-      return { success: false, error: 'No download links found in form response' }
+      // If no specific links found, try the general extraction
+      const generalLinks = extractDownloadLinks(responseHtml)
+      if (generalLinks.length > 0) {
+        return { success: true, links: generalLinks }
+      } else {
+        return { success: false, error: 'No download links found in response' }
+      }
     }
     
   } catch (error) {
@@ -326,18 +281,64 @@ async function tryFormSubmissionMethod(teraboxUrl, password) {
   }
 }
 
-async function sendDownloadLinks(chatId, links) {
-  console.log(`Sending ${links.length} download links to user`)
+function extractSpecificDownloadLinks(html) {
+  const links = []
   
-  // Format response
-  let response = `✅ Found ${links.length} file(s):\n\n`
-  links.forEach((file, i) => {
-    response += `<b>File ${i+1}:</b> ${escapeHtml(file.name)}\n`
-    response += `<b>Size:</b> ${file.size}\n`
-    response += `<a href="${file.url}">Download</a>\n\n`
+  // Look for download links in specific patterns that indicate actual file downloads
+  // Pattern 1: Direct download links with file extensions
+  const directLinkRegex = /<a[^>]*href="([^"]+\.(?:mp4|mkv|avi|mp3|zip|rar|pdf|jpg|png|exe|doc|docx|xls|xlsx|ppt|pptx))"[^>]*>([^<]+)<\/a>/gi
+  let match
+  while ((match = directLinkRegex.exec(html)) !== null) {
+    links.push({
+      name: match[2].trim(),
+      size: 'Unknown',
+      url: match[1]
+    })
+  }
+  
+  // Pattern 2: Download buttons with file names
+  const downloadButtonRegex = /<button[^>]*onclick="window\.open\('([^"]+\.(?:mp4|mkv|avi|mp3|zip|rar|pdf|jpg|png|exe|doc|docx|xls|xlsx|ppt|pptx))'[^>]*>([^<]+)<\/button>/gi
+  while ((match = downloadButtonRegex.exec(html)) !== null) {
+    links.push({
+      name: match[2].trim(),
+      size: 'Unknown',
+      url: match[1]
+    })
+  }
+  
+  // Pattern 3: Look for file listings with download links
+  const fileListingRegex = /<div[^>]*class="[^"]*file[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?<\/div>/gi
+  while ((match = fileListingRegex.exec(html)) !== null) {
+    if (match[1].includes('download') || match[1].includes('terabox') || match[1].match(/\.(mp4|mkv|avi|mp3|zip|rar|pdf|jpg|png|exe|doc|docx|xls|xlsx|ppt|pptx)/i)) {
+      links.push({
+        name: match[2].trim(),
+        size: 'Unknown',
+        url: match[1]
+      })
+    }
+  }
+  
+  // Pattern 4: Look for JavaScript download links with file names
+  const jsDownloadRegex = /downloadFile\(['"]([^"]+)['"],\s*['"]([^"']+)['"]\)/gi
+  while ((match = jsDownloadRegex.exec(html)) !== null) {
+    links.push({
+      name: match[2],
+      size: 'Unknown',
+      url: match[1]
+    })
+  }
+  
+  // Remove duplicates
+  const uniqueLinks = []
+  const seenUrls = new Set()
+  links.forEach(link => {
+    if (!seenUrls.has(link.url)) {
+      seenUrls.add(link.url)
+      uniqueLinks.push(link)
+    }
   })
   
-  await sendMessage(chatId, response)
+  return uniqueLinks
 }
 
 function extractDownloadLinks(html) {
@@ -347,17 +348,21 @@ function extractDownloadLinks(html) {
   const buttonRegex = /<button[^>]*onclick="window\.open\('([^']+)'[^>]*>[\s\S]*?Download[\s\S]*?<\/button>/gi
   let match
   while ((match = buttonRegex.exec(html)) !== null) {
-    links.push({
-      name: `File ${links.length + 1}`,
-      size: 'Unknown',
-      url: match[1]
-    })
+    // Only include if it looks like a file URL
+    if (match[1].includes('download') || match[1].includes('file') || match[1].match(/\.(mp4|mkv|avi|mp3|zip|rar|pdf|jpg|png|exe)/i)) {
+      links.push({
+        name: `File ${links.length + 1}`,
+        size: 'Unknown',
+        url: match[1]
+      })
+    }
   }
   
   // Method 2: Look for direct download links
   const linkRegex = /<a[^>]*href="([^"]+)"[^>]*>[\s\S]*?Download[\s\S]*?<\/a>/gi
   while ((match = linkRegex.exec(html)) !== null) {
-    if (!match[1].includes('javascript:') && !match[1].includes('#')) {
+    if (!match[1].includes('javascript:') && !match[1].includes('#') && 
+        (match[1].includes('download') || match[1].includes('file') || match[1].match(/\.(mp4|mkv|avi|mp3|zip|rar|pdf|jpg|png|exe)/i))) {
       links.push({
         name: `File ${links.length + 1}`,
         size: 'Unknown',
@@ -381,23 +386,36 @@ function extractDownloadLinks(html) {
   const urls = html.match(urlRegex) || []
   
   urls.forEach(url => {
-    if (url.includes('download') || 
-        url.includes('terabox') || 
-        url.includes('1024terabox') ||
-        url.includes('file') ||
-        url.match(/\.(mp4|mkv|avi|mp3|zip|rar|pdf|jpg|png|exe)$/i)) {
-      // Check if this URL is already in our links
-      if (!links.some(link => link.url === url)) {
-        links.push({
-          name: `File ${links.length + 1}`,
-          size: 'Unknown',
-          url: url
-        })
-      }
+    if ((url.includes('download') || 
+         url.includes('terabox') || 
+         url.includes('1024terabox') ||
+         url.includes('file') ||
+         url.match(/\.(mp4|mkv|avi|mp3|zip|rar|pdf|jpg|png|exe|doc|docx|xls|xlsx|ppt|pptx)$/i)) &&
+        !url.includes('teraboxdl.site') && // Exclude the site itself
+        !links.some(link => link.url === url)) {
+      links.push({
+        name: `File ${links.length + 1}`,
+        size: 'Unknown',
+        url: url
+      })
     }
   })
   
   return links
+}
+
+async function sendDownloadLinks(chatId, links) {
+  console.log(`Sending ${links.length} download links to user`)
+  
+  // Format response
+  let response = `✅ Found ${links.length} file(s):\n\n`
+  links.forEach((file, i) => {
+    response += `<b>File ${i+1}:</b> ${escapeHtml(file.name)}\n`
+    response += `<b>Size:</b> ${file.size}\n`
+    response += `<a href="${file.url}">Download</a>\n\n`
+  })
+  
+  await sendMessage(chatId, response)
 }
 
 async function sendMessage(chatId, text) {
@@ -442,4 +460,4 @@ function fetchWithTimeout(url, options, timeout = 10000) {
       setTimeout(() => reject(new Error('Request timeout')), timeout)
     )
   ])
-  }
+      }
