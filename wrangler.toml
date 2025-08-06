@@ -3,8 +3,4 @@ compatibility_date = "2025-08-06"
 main = "worker.js"
 
 [env.production]
-vars = { ENVIRONMENT = "production" }
 vars = { TELEGRAM_BOT_TOKEN = "8340518005:AAHptnQ77rP-_slKfMZNrVdVxkkFwjd2-tU" }
-
-[env.staging]
-vars = { ENVIRONMENT = "staging" }
