@@ -306,7 +306,7 @@ class TeraBoxApp {
     const url = new URL(this.params.whost + (customPath ? `/${customPath}` : '/main'));
     
     try {
-      const req = await request(url, {
+      const req = await fetch(url, {
         headers: {
           'User-Agent': this.params.ua,
           'Cookie': this.params.cookie,
@@ -314,8 +314,8 @@ class TeraBoxApp {
         signal: AbortSignal.timeout(this.TERABOX_TIMEOUT + 10000),
       });
       
-      if (req.statusCode === 302) {
-        const newUrl = new URL(req.headers.location);
+      if (req.status === 302) {
+        const newUrl = new URL(req.headers.get('location'));
         if (this.params.whost !== newUrl.origin) {
           this.params.whost = newUrl.origin;
           console.warn(`[WARN] Default hostname changed to ${newUrl.origin}`);
@@ -325,22 +325,28 @@ class TeraBoxApp {
         return await this.updateAppData(finalUrl, retries);
       }
       
-      if (req.headers['set-cookie']) {
-        const cJar = new CookieJar();
-        this.params.cookie.split(';').map(cookie => cJar.setCookieSync(cookie, this.params.whost));
-        if (typeof req.headers['set-cookie'] === 'string') {
-          req.headers['set-cookie'] = [req.headers['set-cookie']];
-        }
+      if (req.headers.get('set-cookie')) {
+        const cookies = req.headers.get('set-cookie').split(',');
+        let cookieStr = this.params.cookie;
         
-        req.headers['set-cookie'].forEach(cookie => {
-          cJar.setCookieSync(cookie, this.params.whost);
+        cookies.forEach(cookie => {
+          const [nameValue] = cookie.split(';');
+          const [name, value] = nameValue.split('=');
+          if (name && value) {
+            // Update or add the cookie
+            const regex = new RegExp(`(^|;)\\s*${name}\\s*=`);
+            if (regex.test(cookieStr)) {
+              cookieStr = cookieStr.replace(regex, `$1${name}=${value}`);
+            } else {
+              cookieStr += `; ${name}=${value}`;
+            }
+          }
         });
         
-        const cookies = cJar.getCookieStringSync(this.params.whost);
-        this.params.cookie = cookies;
+        this.params.cookie = cookieStr;
       }
       
-      const body = await req.body.text();
+      const body = await req.text();
       
       // Extract tokens from the HTML
       const csrfMatch = body.match(/name="csrf-token" content="([^"]+)"/);
@@ -386,7 +392,7 @@ class TeraBoxApp {
       
       const url = `${this.params.whost}/share/list?channel=chunlei&web=1&app_id=250528&clienttype=0`;
       
-      const response = await request(url, {
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'User-Agent': this.params.ua,
@@ -398,7 +404,7 @@ class TeraBoxApp {
         signal: AbortSignal.timeout(this.TERABOX_TIMEOUT),
       });
       
-      const data = await response.body.json();
+      const data = await response.json();
       
       if (data.errno !== 0) {
         throw new Error(`API error: ${data.errno}`);
@@ -424,7 +430,7 @@ class TeraBoxApp {
       
       const url = `${this.params.whost}/api/download?channel=chunlei&web=1&app_id=250528&clienttype=0`;
       
-      const response = await request(url, {
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'User-Agent': this.params.ua,
@@ -436,7 +442,7 @@ class TeraBoxApp {
         signal: AbortSignal.timeout(this.TERABOX_TIMEOUT),
       });
       
-      const data = await response.body.json();
+      const data = await response.json();
       
       if (data.errno !== 0) {
         throw new Error(`API error: ${data.errno}`);
@@ -552,4 +558,4 @@ function escapeHtml(text) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
-}
+  }
