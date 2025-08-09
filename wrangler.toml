@@ -4,3 +4,4 @@ main = "worker.js"
 
 [vars]
 TELEGRAM_BOT_TOKEN = "8340518005:AAHptnQ77rP-_slKfMZNrVdVxkkFwjd2-tU"
+ZAI_API_KEY = "93bf2ce436a144bb8f14061458cef55b.waBULwb6TvCHymvy"
