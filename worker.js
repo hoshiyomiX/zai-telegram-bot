@@ -52,8 +52,8 @@ async function handleUpdate(update) {
     if (text === '/start') {
       await sendMessage(chatId, 
         `🤖 <b>Z.ai Chat Bot</b>\n\n` +
-        `Hello! I'm powered by Z.ai's GLM-4.5-flash model. Send me any message and I'll respond as an AI assistant.\n\n` +
-        `You can ask me questions, request help with tasks, or just have a conversation!`
+        `Hello! I'm powered by Z.ai's GLM-4.5 model. Send me any message and I'll respond as an AI assistant.\n\n` +
+        `Note: To avoid rate limiting, please wait a moment between messages.`
       )
       return
     }
@@ -65,7 +65,7 @@ async function handleUpdate(update) {
         `Available commands:\n` +
         `/start - Welcome message\n` +
         `/help - Show this help message\n\n` +
-        `Just send me any text message and I'll respond as an AI assistant.`
+        `Note: To avoid rate limiting, please wait a moment between messages.`
       )
       return
     }
@@ -75,8 +75,8 @@ async function handleUpdate(update) {
       // Send a "typing" indicator to show the bot is thinking
       await sendChatAction(chatId, 'typing')
       
-      // Get response from Z.ai
-      const aiResponse = await getZaiResponse(text)
+      // Get response from Z.ai with rate limiting
+      const aiResponse = await getZaiResponseWithRateLimit(chatId, text)
       
       // Send the response back to the user
       await sendMessage(chatId, aiResponse)
@@ -86,20 +86,60 @@ async function handleUpdate(update) {
   }
 }
 
+// Rate limiting and retry logic for Z.ai API
+async function getZaiResponseWithRateLimit(chatId, message) {
+  const maxRetries = 3;
+  const baseDelay = 1000; // 1 second base delay
+  const maxDelay = 16000; // 16 seconds max delay
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      // Add jitter to spread out requests
+      const jitter = Math.random() * 1000; // 0-1 second random jitter
+      const delay = attempt === 0 ? 0 : Math.min(baseDelay * Math.pow(2, attempt) + jitter, maxDelay);
+      
+      if (delay > 0) {
+        console.log(`Rate limiting: Waiting ${delay.toFixed(0)}ms before attempt ${attempt + 1}`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+      
+      console.log(`Attempt ${attempt + 1} to call Z.ai API for chat ${chatId}`);
+      
+      const response = await getZaiResponse(message);
+      
+      // If we get a successful response, return it
+      return response;
+      
+    } catch (error) {
+      console.error(`Attempt ${attempt + 1} failed:`, error.message);
+      
+      // If it's a 429 error and we have retries left, continue
+      if (error.message.includes('429') && attempt < maxRetries) {
+        console.log('Rate limit hit, retrying...');
+        continue;
+      }
+      
+      // If it's any other error or we're out of retries, throw
+      throw error;
+    }
+  }
+  
+  throw new Error('Max retries exceeded for Z.ai API');
+}
+
 async function getZaiResponse(message) {
   try {
-    console.log('Sending message to Z.ai...')
+    console.log('Sending message to Z.ai...');
     
     // Get the API key from environment variables
-    const apiKey = ZAI_API_KEY
+    const apiKey = ZAI_API_KEY;
     if (!apiKey) {
-      throw new Error('ZAI_API_KEY environment variable is not set')
+      throw new Error('ZAI_API_KEY environment variable is not set');
     }
     
     // Prepare the request body for Z.ai API
-    // Based on the JavaScript example, we use the correct endpoint and structure
     const requestBody = {
-      model: "glm-4.5-flash",
+      model: "glm-4.5",
       messages: [
         {
           role: "user",
@@ -109,7 +149,7 @@ async function getZaiResponse(message) {
     }
     
     // Make the request to Z.ai API
-    const url = 'https://api.z.ai/api/paas/v4/chat/completions'
+    const url = 'https://api.z.ai/api/paas/v4/chat/completions';
     const options = {
       method: 'POST',
       headers: {
@@ -123,106 +163,19 @@ async function getZaiResponse(message) {
     const response = await fetchWithTimeout(url, options, 30000)
     
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error('Z.ai API error:', errorText)
-      throw new Error(`Z.ai API returned ${response.status}: ${errorText}`)
+      const errorText = await response.text();
+      console.error('Z.ai API error:', errorText);
+      
+      // If it's a 429 error, throw a special error that includes the error text
+      if (response.status === 429) {
+        throw new Error(`429: ${errorText}`);
+      }
+      
+      throw new Error(`Z.ai API returned ${response.status}: ${errorText}`);
     }
     
-    const data = await response.json()
-    console.log('Z.ai response received:', JSON.stringify(data))
+    const data = await response.json();
+    console.log('Z.ai response received');
     
     // Extract the AI response text based on the 200 response format
-    if (data.choices && data.choices.length > 0 && data.choices[0].message) {
-      // Check if there's reasoning content
-      let responseText = data.choices[0].message.content
-      if (data.choices[0].message.reasoning_content) {
-        responseText += `\n\n📝 <b>Reasoning:</b>\n${data.choices[0].message.reasoning_content}`
-      }
-      
-      // Check if there are tool calls
-      if (data.choices[0].message.tool_calls && data.choices[0].message.tool_calls.length > 0) {
-        responseText += `\n\n🔧 <b>Tool Calls:</b>\n`
-        data.choices[0].message.tool_calls.forEach(tool => {
-          responseText += `- ${tool.function.name}\n`
-        })
-      }
-      
-      // Check if there's web search information
-      if (data.web_search && data.web_search.length > 0) {
-        responseText += `\n\n🔍 <b>Web Search Results:</b>\n`
-        data.web_search.forEach(result => {
-          responseText += `- ${result.title}: ${result.link}\n`
-        })
-      }
-      
-      return responseText
-    } else {
-      throw new Error('Unexpected response format from Z.ai API')
-    }
-    
-  } catch (error) {
-    console.error('Error getting Z.ai response:', error)
-    return `Sorry, I encountered an error while processing your request: ${error.message}`
-  }
-}
-
-async function sendMessage(chatId, text) {
-  try {
-    console.log(`Sending message to ${chatId}: ${text.substring(0, 100)}...`)
-    const token = TELEGRAM_BOT_TOKEN
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true
-      })
-    })
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('Error sending message:', errorText)
-    } else {
-      console.log('Message sent successfully')
-    }
-  } catch (error) {
-    console.error('Error in sendMessage:', error)
-  }
-}
-
-async function sendChatAction(chatId, action) {
-  try {
-    const token = TELEGRAM_BOT_TOKEN
-    await fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        action: action
-      })
-    })
-  } catch (error) {
-    console.error('Error sending chat action:', error)
-  }
-}
-
-function escapeHtml(text) {
-  if (!text) return ''
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-}
-
-// Helper function for fetch with timeout
-function fetchWithTimeout(url, options, timeout = 10000) {
-  console.log(`Fetching ${url} with timeout ${timeout}ms`)
-  return Promise.race([
-    fetch(url, options),
-    new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Request timeout')), timeout)
-    )
-  ])
-}
+    if (data.choices &&
