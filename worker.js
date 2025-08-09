@@ -52,7 +52,7 @@ async function handleUpdate(update) {
     if (text === '/start') {
       await sendMessage(chatId, 
         `🤖 <b>Z.ai Chat Bot</b>\n\n` +
-        `Hello! I'm powered by Z.ai's GLM-4.5-Flash model (Free Tier). Send me any message and I'll respond as an AI assistant.\n\n` +
+        `Hello! I'm powered by Z.ai's GLM-4.5-flash model. Send me any message and I'll respond as an AI assistant.\n\n` +
         `You can ask me questions, request help with tasks, or just have a conversation!`
       )
       return
@@ -65,8 +65,7 @@ async function handleUpdate(update) {
         `Available commands:\n` +
         `/start - Welcome message\n` +
         `/help - Show this help message\n\n` +
-        `Just send me any text message and I'll respond as an AI assistant.\n\n` +
-        `🆓 <b>Free Tier:</b> I'm using GLM-4.5-Flash which is free to use!`
+        `Just send me any text message and I'll respond as an AI assistant.`
       )
       return
     }
@@ -98,9 +97,9 @@ async function getZaiResponse(message) {
     }
     
     // Prepare the request body for Z.ai API
-    // Using GLM-4.5-Flash model for free tier
+    // Based on the JavaScript example, we use the correct endpoint and structure
     const requestBody = {
-      model: "glm-4.5-flash", // Using GLM-4.5-Flash for free usage
+      model: "glm-4.5-flash",
       messages: [
         {
           role: "user",
@@ -156,9 +155,6 @@ async function getZaiResponse(message) {
         })
       }
       
-      // Add a note about using the free model
-      responseText += `\n\n🆓 <b>Powered by GLM-4.5-Flash (Free Tier)</b>`
-      
       return responseText
     } else {
       throw new Error('Unexpected response format from Z.ai API')
@@ -189,4 +185,44 @@ async function sendMessage(chatId, text) {
       const errorText = await response.text()
       console.error('Error sending message:', errorText)
     } else {
-      console
+      console.log('Message sent successfully')
+    }
+  } catch (error) {
+    console.error('Error in sendMessage:', error)
+  }
+}
+
+async function sendChatAction(chatId, action) {
+  try {
+    const token = TELEGRAM_BOT_TOKEN
+    await fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        action: action
+      })
+    })
+  } catch (error) {
+    console.error('Error sending chat action:', error)
+  }
+}
+
+function escapeHtml(text) {
+  if (!text) return ''
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+// Helper function for fetch with timeout
+function fetchWithTimeout(url, options, timeout = 10000) {
+  console.log(`Fetching ${url} with timeout ${timeout}ms`)
+  return Promise.race([
+    fetch(url, options),
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Request timeout')), timeout)
+    )
+  ])
+}
