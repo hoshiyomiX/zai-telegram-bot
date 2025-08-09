@@ -1,4 +1,4 @@
-name = "zai-telegram-bot-bot"
+name = "zai-telegram-bot"
 compatibility_date = "2025-08-06"
 main = "worker.js"
 
