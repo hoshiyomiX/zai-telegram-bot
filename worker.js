@@ -51,9 +51,9 @@ async function handleUpdate(update) {
     // Handle /start command
     if (text === '/start') {
       await sendMessage(chatId, 
-        `🤖 <b>GLM-4.5 Chat Bot</b>\n\n` +
-        `Hello! I'm powered by Z.ai's GLM-4.5 model. I can handle up to 128k tokens of context.\n\n` +
-        `Send me any message and I'll respond as an AI assistant. You can ask questions, request help with tasks, or just have a conversation!`
+        `🤖 <b>Z.ai Chat Bot</b>\n\n` +
+        `Hello! I'm powered by Z.ai's GLM-4.5 model. Send me any message and I'll respond as an AI assistant.\n\n` +
+        `You can ask me questions, request help with tasks, or just have a conversation!`
       )
       return
     }
@@ -65,8 +65,7 @@ async function handleUpdate(update) {
         `Available commands:\n` +
         `/start - Welcome message\n` +
         `/help - Show this help message\n\n` +
-        `Just send me any text message and I'll respond as an AI assistant.\n\n` +
-        `I'm powered by GLM-4.5 with 128k context length!`
+        `Just send me any text message and I'll respond as an AI assistant.`
       )
       return
     }
@@ -89,7 +88,7 @@ async function handleUpdate(update) {
 
 async function getZaiResponse(message) {
   try {
-    console.log('Sending message to Z.ai GLM-4.5...')
+    console.log('Sending message to Z.ai...')
     
     // Get the API key from environment variables
     const apiKey = ZAI_API_KEY
@@ -98,33 +97,30 @@ async function getZaiResponse(message) {
     }
     
     // Prepare the request body for Z.ai API
-    // Based on the official GLM-4.5 documentation
+    // Based on the JavaScript example, we use the correct endpoint and structure
     const requestBody = {
-      model: "glm-4-5", // Using GLM-4-5 model
+      model: "glm-4.5",
       messages: [
         {
           role: "user",
           content: message
         }
       ]
-      // Note: max_tokens is optional and will be determined by the model
-      // Temperature is optional and defaults to 0.7
     }
     
-    // Make the request to Z.ai API using the official endpoint
-    const response = await fetchWithTimeout(
-      'https://open.bigmodel.cn/paas/v4/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'User-Agent': 'GLM-4.5 Telegram Bot'
-        },
-        body: JSON.stringify(requestBody)
+    // Make the request to Z.ai API
+    const url = 'https://api.z.ai/api/paas/v4/chat/completions'
+    const options = {
+      method: 'POST',
+      headers: {
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
       },
-      60000 // 60 second timeout for longer responses
-    )
+      body: JSON.stringify(requestBody)
+    }
+    
+    const response = await fetchWithTimeout(url, options, 30000)
     
     if (!response.ok) {
       const errorText = await response.text()
@@ -133,11 +129,33 @@ async function getZaiResponse(message) {
     }
     
     const data = await response.json()
-    console.log('Z.ai GLM-4.5 response received')
+    console.log('Z.ai response received:', JSON.stringify(data))
     
-    // Extract the AI response text based on the official documentation
+    // Extract the AI response text based on the 200 response format
     if (data.choices && data.choices.length > 0 && data.choices[0].message) {
-      return data.choices[0].message.content
+      // Check if there's reasoning content
+      let responseText = data.choices[0].message.content
+      if (data.choices[0].message.reasoning_content) {
+        responseText += `\n\n📝 <b>Reasoning:</b>\n${data.choices[0].message.reasoning_content}`
+      }
+      
+      // Check if there are tool calls
+      if (data.choices[0].message.tool_calls && data.choices[0].message.tool_calls.length > 0) {
+        responseText += `\n\n🔧 <b>Tool Calls:</b>\n`
+        data.choices[0].message.tool_calls.forEach(tool => {
+          responseText += `- ${tool.function.name}\n`
+        })
+      }
+      
+      // Check if there's web search information
+      if (data.web_search && data.web_search.length > 0) {
+        responseText += `\n\n🔍 <b>Web Search Results:</b>\n`
+        data.web_search.forEach(result => {
+          responseText += `- ${result.title}: ${result.link}\n`
+        })
+      }
+      
+      return responseText
     } else {
       throw new Error('Unexpected response format from Z.ai API')
     }
