@@ -1,4 +1,4 @@
-name = "terabox-bot"
+name = "zai-telegram-bot-bot"
 compatibility_date = "2025-08-06"
 main = "worker.js"
 
