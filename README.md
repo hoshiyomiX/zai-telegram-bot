@@ -1,7 +1,5 @@
 # z.AI Telegram Bot
 
-Cloudflare Worker that converts Terabox share links to direct download links via Telegram bot.
-
 ## Setup
 
 1. Create a Telegram bot via [@BotFather](https://t.me/BotFather)
