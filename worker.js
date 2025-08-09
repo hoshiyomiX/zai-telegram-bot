@@ -52,7 +52,7 @@ async function handleUpdate(update) {
     if (text === '/start') {
       await sendMessage(chatId, 
         `🤖 <b>Z.ai Chat Bot</b>\n\n` +
-        `Hello! I'm powered by Z.ai's GLM-4.5 model. Send me any message and I'll respond as an AI assistant.\n\n` +
+        `Hello! I'm powered by Z.ai's GLM-4 model. Send me any message and I'll respond as an AI assistant.\n\n` +
         `You can ask me questions, request help with tasks, or just have a conversation!`
       )
       return
@@ -98,15 +98,13 @@ async function getZaiResponse(message) {
     
     // Prepare the request body for Z.ai API
     const requestBody = {
-      model: "glm-4.5", // Using GLM-4.5 model
+      model: "glm-4",
       messages: [
         {
           role: "user",
           content: message
         }
-      ],
-      max_tokens: 1000,
-      temperature: 0.7
+      ]
     }
     
     // Make the request to Z.ai API
@@ -116,8 +114,7 @@ async function getZaiResponse(message) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'User-Agent': 'Z.ai Telegram Bot'
+          'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify(requestBody)
       },
@@ -131,7 +128,7 @@ async function getZaiResponse(message) {
     }
     
     const data = await response.json()
-    console.log('Z.ai response received')
+    console.log('Z.ai response received:', JSON.stringify(data))
     
     // Extract the AI response text
     if (data.choices && data.choices.length > 0 && data.choices[0].message) {
@@ -142,7 +139,8 @@ async function getZaiResponse(message) {
     
   } catch (error) {
     console.error('Error getting Z.ai response:', error)
-    return `Sorry, I encountered an error while processing your request: ${error.message}`
+    // Return a clean error message
+    return `Sorry, I encountered an error while processing your request. The Z.ai service might be temporarily unavailable. Please try again later.`
   }
 }
 
