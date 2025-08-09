@@ -52,8 +52,7 @@ async function handleUpdate(update) {
     if (text === '/start') {
       await sendMessage(chatId, 
         `🤖 <b>Z.ai Chat Bot</b>\n\n` +
-        `Hello! I'm powered by Z.ai's GLM-4.5-Flash model. Send me any message and I'll respond as an AI assistant.\n\n` +
-        `This is a free model with no usage limits!\n\n` +
+        `Hello! I'm powered by Z.ai's GLM-4.5-Flash model (Free Tier). Send me any message and I'll respond as an AI assistant.\n\n` +
         `You can ask me questions, request help with tasks, or just have a conversation!`
       )
       return
@@ -67,7 +66,7 @@ async function handleUpdate(update) {
         `/start - Welcome message\n` +
         `/help - Show this help message\n\n` +
         `Just send me any text message and I'll respond as an AI assistant.\n\n` +
-        `I'm using the free GLM-4.5-Flash model, so there are no usage limits!`
+        `🆓 <b>Free Tier:</b> I'm using GLM-4.5-Flash which is free to use!`
       )
       return
     }
@@ -99,9 +98,9 @@ async function getZaiResponse(message) {
     }
     
     // Prepare the request body for Z.ai API
-    // Using GLM-4.5-Flash model for free usage
+    // Using GLM-4.5-Flash model for free tier
     const requestBody = {
-      model: "glm-4.5-flash", // Using the free model
+      model: "glm-4.5-flash", // Using GLM-4.5-Flash for free usage
       messages: [
         {
           role: "user",
@@ -127,28 +126,13 @@ async function getZaiResponse(message) {
     if (!response.ok) {
       const errorText = await response.text()
       console.error('Z.ai API error:', errorText)
-      
-      // Parse the error to check for insufficient balance
-      try {
-        const errorData = JSON.parse(errorText)
-        if (errorData.error && errorData.error.code === 1113) {
-          // Insufficient balance error
-          return `⚠️ <b>Insufficient Balance</b>\n\n` +
-                 `The GLM-4 model requires payment, but I'm trying to use the free GLM-4.5-Flash model instead.\n\n` +
-                 `Please try again or contact the bot owner to check the API configuration.`
-        }
-      } catch (e) {
-        // If we can't parse the error, just return the raw error
-        throw new Error(`Z.ai API returned ${response.status}: ${errorText}`)
-      }
-      
       throw new Error(`Z.ai API returned ${response.status}: ${errorText}`)
     }
     
     const data = await response.json()
     console.log('Z.ai response received:', JSON.stringify(data))
     
-    // Extract the AI response text based on the response format
+    // Extract the AI response text based on the 200 response format
     if (data.choices && data.choices.length > 0 && data.choices[0].message) {
       // Check if there's reasoning content
       let responseText = data.choices[0].message.content
@@ -172,8 +156,8 @@ async function getZaiResponse(message) {
         })
       }
       
-      // Add a note that we're using the free model
-      responseText += `\n\n💡 <i>Powered by GLM-4.5-Flash (Free Model)</i>`
+      // Add a note about using the free model
+      responseText += `\n\n🆓 <b>Powered by GLM-4.5-Flash (Free Tier)</b>`
       
       return responseText
     } else {
@@ -181,4 +165,28 @@ async function getZaiResponse(message) {
     }
     
   } catch (error) {
-    console.error('Error getting
+    console.error('Error getting Z.ai response:', error)
+    return `Sorry, I encountered an error while processing your request: ${error.message}`
+  }
+}
+
+async function sendMessage(chatId, text) {
+  try {
+    console.log(`Sending message to ${chatId}: ${text.substring(0, 100)}...`)
+    const token = TELEGRAM_BOT_TOKEN
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true
+      })
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Error sending message:', errorText)
+    } else {
+      console
