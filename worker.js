@@ -51,9 +51,9 @@ async function handleUpdate(update) {
     // Handle /start command
     if (text === '/start') {
       await sendMessage(chatId, 
-        `🤖 <b>Z.ai Chat Bot</b>\n\n` +
-        `Hello! I'm powered by Z.ai's GLM model. Send me any message and I'll respond as an AI assistant.\n\n` +
-        `You can ask me questions, request help with tasks, or just have a conversation!`
+        `🤖 <b>GLM-4.5 Chat Bot</b>\n\n` +
+        `Hello! I'm powered by Z.ai's GLM-4.5 model. I can handle up to 128k tokens of context.\n\n` +
+        `Send me any message and I'll respond as an AI assistant. You can ask questions, request help with tasks, or just have a conversation!`
       )
       return
     }
@@ -65,7 +65,8 @@ async function handleUpdate(update) {
         `Available commands:\n` +
         `/start - Welcome message\n` +
         `/help - Show this help message\n\n` +
-        `Just send me any text message and I'll respond as an AI assistant.`
+        `Just send me any text message and I'll respond as an AI assistant.\n\n` +
+        `I'm powered by GLM-4.5 with 128k context length!`
       )
       return
     }
@@ -88,7 +89,7 @@ async function handleUpdate(update) {
 
 async function getZaiResponse(message) {
   try {
-    console.log('Sending message to Z.ai...')
+    console.log('Sending message to Z.ai GLM-4.5...')
     
     // Get the API key from environment variables
     const apiKey = ZAI_API_KEY
@@ -96,113 +97,54 @@ async function getZaiResponse(message) {
       throw new Error('ZAI_API_KEY environment variable is not set')
     }
     
-    // Try different possible API endpoints and formats
-    const apiConfigs = [
-      {
-        url: 'https://api.z.ai/v1/chat/completions',
-        body: {
-          model: "glm-4",
-          messages: [
-            {
-              role: "user",
-              content: message
-            }
-          ]
+    // Prepare the request body for Z.ai API
+    // Based on the official GLM-4.5 documentation
+    const requestBody = {
+      model: "glm-4-5", // Using GLM-4-5 model
+      messages: [
+        {
+          role: "user",
+          content: message
         }
-      },
-      {
-        url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-        body: {
-          model: "glm-4",
-          messages: [
-            {
-              role: "user",
-              content: message
-            }
-          ]
-        }
-      },
-      {
-        url: 'https://open.bigmodel.cn/api/paas/v3/chat/completions',
-        body: {
-          model: "glm-4",
-          messages: [
-            {
-              role: "user",
-              content: message
-            }
-          ]
-        }
-      },
-      {
-        url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-        body: {
-          model: "glm-4-air",
-          messages: [
-            {
-              role: "user",
-              content: message
-            }
-          ]
-        }
-      }
-    ]
-    
-    let lastError = null
-    
-    // Try each API configuration until one works
-    for (const config of apiConfigs) {
-      try {
-        console.log(`Trying API endpoint: ${config.url}`)
-        
-        const response = await fetchWithTimeout(
-          config.url,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify(config.body)
-          },
-          30000 // 30 second timeout for AI responses
-        )
-        
-        if (response.ok) {
-          console.log(`Success with endpoint: ${config.url}`)
-          const data = await response.json()
-          console.log('API response:', JSON.stringify(data))
-          
-          // Extract the AI response text
-          if (data.choices && data.choices.length > 0 && data.choices[0].message) {
-            return data.choices[0].message.content
-          } else if (data.data && data.data.choices && data.data.choices.length > 0 && data.data.choices[0].message) {
-            return data.data.choices[0].message.content
-          } else {
-            throw new Error('Unexpected response format from API')
-          }
-        } else {
-          const errorText = await response.text()
-          console.error(`API returned ${response.status}: ${errorText}`)
-          lastError = new Error(`API returned ${response.status}: ${errorText}`)
-        }
-      } catch (error) {
-        console.error(`Error with endpoint ${config.url}:`, error)
-        lastError = error
-      }
+      ]
+      // Note: max_tokens is optional and will be determined by the model
+      // Temperature is optional and defaults to 0.7
     }
     
-    // If all endpoints failed, throw the last error
-    if (lastError) {
-      throw lastError
+    // Make the request to Z.ai API using the official endpoint
+    const response = await fetchWithTimeout(
+      'https://open.bigmodel.cn/paas/v4/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'User-Agent': 'GLM-4.5 Telegram Bot'
+        },
+        body: JSON.stringify(requestBody)
+      },
+      60000 // 60 second timeout for longer responses
+    )
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Z.ai API error:', errorText)
+      throw new Error(`Z.ai API returned ${response.status}: ${errorText}`)
+    }
+    
+    const data = await response.json()
+    console.log('Z.ai GLM-4.5 response received')
+    
+    // Extract the AI response text based on the official documentation
+    if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+      return data.choices[0].message.content
     } else {
-      throw new Error('All API endpoints failed')
+      throw new Error('Unexpected response format from Z.ai API')
     }
     
   } catch (error) {
     console.error('Error getting Z.ai response:', error)
-    // Return a clean error message
-    return `Sorry, I encountered an error while processing your request. The Z.ai service might be temporarily unavailable or there might be an issue with the API configuration. Please try again later.`
+    return `Sorry, I encountered an error while processing your request: ${error.message}`
   }
 }
 
