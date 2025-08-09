@@ -1,7 +1,7 @@
 {
-  "name": "terabox-telegram-bot",
+  "name": "zai-telegram-bot",
   "version": "1.0.0",
-  "description": "Cloudflare Worker for Terabox to Telegram bot",
+  "description": "Cloudflare Worker for z.AI to Telegram bot",
   "main": "worker.js",
   "scripts": {
     "dev": "wrangler dev",
