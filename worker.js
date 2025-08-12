@@ -51,8 +51,8 @@ async function handleUpdate(update) {
     // Handle /start command
     if (text === '/start') {
       await sendMessage(chatId, 
-        `🤖 <b>Gemini 1.0 Pro Chat Bot</b>\n\n` +
-        `Hello! I'm powered by Google's Gemini 1.0 Pro model. Send me any message and I'll respond as an AI assistant.\n\n` +
+        `🤖 <b>Gemini 2.5 Flash-Lite Chat Bot</b>\n\n` +
+        `Hello! I'm powered by Google's Gemini 2.5 Flash-Lite model. Send me any message and I'll respond as an AI assistant.\n\n` +
         `You can ask me questions, request help with tasks, or just have a conversation!`
       )
       return
@@ -105,7 +105,7 @@ async function getGeminiResponseWithRetry(message, maxRetries = 2) {
 
 async function getGeminiResponse(message) {
   try {
-    console.log('Sending message to Gemini 1.0 Pro...')
+    console.log('Sending message to Gemini 2.5 Flash-Lite...')
     
     // Get the API key from environment variables
     const apiKey = GEMINI_API_KEY
@@ -153,9 +153,9 @@ async function getGeminiResponse(message) {
       ]
     }
     
-    // Make the request to Gemini 1.0 Pro API with shorter timeout
+    // Make the request to Gemini 2.5 Flash-Lite API with shorter timeout
     const response = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
