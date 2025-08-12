@@ -62,7 +62,7 @@ async function handleUpdate(update) {
     if (text === '/start') {
       await sendMessage(chatId, 
         `🤖 <b>Gemini 2.5 Flash-Lite Chat Bot</b>\n\n` +
-        `Hello! I'm powered by Google's Gemini 2.5 Flash-Lite model with reasoning capabilities. Send me any message and I'll respond as an AI assistant.\n\n` +
+        `Hello! I'm powered by Google's Gemini 2.5 Flash-Lite model with enhanced reasoning capabilities. Send me any message and I'll respond as an AI assistant.\n\n` +
         `You can ask me questions, request help with tasks, or just have a conversation!`
       )
       return
@@ -74,28 +74,12 @@ async function handleUpdate(update) {
         `📖 <b>Help</b>\n\n` +
         `Available commands:\n` +
         `/start - Welcome message\n` +
-        `/help - Show this help message\n` +
-        `/reasoning - Toggle step-by-step reasoning mode\n\n` +
+        `/help - Show this help message\n\n` +
         `In groups, I only respond when:\n` +
         `• You tag me @${botUsername}\n` +
         `• You reply to my message\n` +
-        `• You reply to a message with a topic I should discuss`
-      )
-      return
-    }
-    
-    // Handle /reasoning command
-    if (text === '/reasoning') {
-      // Toggle reasoning mode (stored in KV)
-      const reasoningKey = `reasoning:${chatId}`
-      const currentMode = await BOT_CACHE.get(reasoningKey)
-      const newMode = currentMode === 'enabled' ? 'disabled' : 'enabled'
-      await BOT_CACHE.put(reasoningKey, newMode, { expirationTtl: 86400 }) // 24 hours
-      
-      await sendMessage(chatId, 
-        `🧠 <b>Reasoning Mode</b>\n\n` +
-        `Step-by-step reasoning is now ${newMode}.\n\n` +
-        `When enabled, I'll provide detailed explanations of my thought process before giving you an answer.`
+        `• You reply to a message with a topic I should discuss\n\n` +
+        `I use enhanced reasoning capabilities to provide thoughtful responses!`
       )
       return
     }
@@ -112,12 +96,8 @@ async function handleUpdate(update) {
         console.log(`Replying to context: ${context.substring(0, 100)}...`)
       }
       
-      // Check if reasoning mode is enabled for this chat
-      const reasoningKey = `reasoning:${chatId}`
-      const reasoningMode = await BOT_CACHE.get(reasoningKey) === 'enabled'
-      
       // Get response from Gemini with retry logic
-      const aiResponse = await getGeminiResponseWithRetry(text, context, reasoningMode)
+      const aiResponse = await getGeminiResponseWithRetry(text, context)
       
       // Send the response back to the user
       await sendMessage(chatId, aiResponse)
@@ -134,46 +114,58 @@ async function handleUpdate(update) {
 
 // Check if bot should respond to the message
 function isBotSummoned(message, botUsername) {
-  // Debug log
   console.log(`Checking if bot is summoned. Bot username: @${botUsername}`)
   
   // Check if message is a reply to bot's message
-  if (message.reply_to_message && message.reply_to_message.from && 
-      message.reply_to_message.from.username === botUsername) {
-    console.log('Bot summoned: Reply to bot message')
-    return true
+  if (message.reply_to_message && message.reply_to_message.from) {
+    const replyFromUsername = message.reply_to_message.from.username
+    console.log(`Reply to message from: ${replyFromUsername}`)
+    
+    if (replyFromUsername === botUsername) {
+      console.log('Bot summoned: reply to bot message')
+      return true
+    }
   }
   
   // Check if message contains bot mention
-  if (message.entities) {
-    console.log(`Found ${message.entities.length} entities in message`)
+  if (message.entities && message.text) {
+    console.log(`Message entities: ${JSON.stringify(message.entities)}`)
     
     for (const entity of message.entities) {
-      console.log(`Entity type: ${entity.type}, offset: ${entity.offset}, length: ${entity.length}`)
-      
       if (entity.type === 'mention') {
         const mention = message.text.substring(entity.offset, entity.offset + entity.length)
         console.log(`Found mention: ${mention}`)
         
         if (mention === `@${botUsername}`) {
-          console.log('Bot summoned: Direct mention')
+          console.log('Bot summoned: mention entity matches')
           return true
         }
       }
       
-      // Handle text_mention (when someone is mentioned without @ but with a link)
+      // Also check for text_mention type
       if (entity.type === 'text_mention' && entity.user) {
         console.log(`Found text_mention for user: ${entity.user.username || entity.user.id}`)
         
-        // If we have the bot's user ID stored, we could check it here
-        // For now, we'll rely on the username check above
+        // If we have the bot's user ID, we could compare here
+        // For now, we'll assume any text_mention is a potential summon
+        // This is a fallback that might cause false positives but ensures we don't miss summons
+        if (entity.user.username === botUsername) {
+          console.log('Bot summoned: text_mention username matches')
+          return true
+        }
       }
     }
   }
   
+  // Fallback: check if the message text contains the bot's username
+  if (message.text && message.text.includes(`@${botUsername}`)) {
+    console.log('Bot summoned: username found in message text (fallback)')
+    return true
+  }
+  
   // Check if message is a reply to a message with a topic
   if (message.reply_to_message && message.reply_to_message.text) {
-    console.log('Bot summoned: Reply to message for context')
+    console.log('Bot summoned: reply to a message with context')
     return true
   }
   
@@ -181,10 +173,10 @@ function isBotSummoned(message, botUsername) {
   return false
 }
 
-async function getGeminiResponseWithRetry(message, context = '', reasoningMode = false, maxRetries = 2) {
+async function getGeminiResponseWithRetry(message, context = '', maxRetries = 2) {
   for (let i = 0; i < maxRetries; i++) {
     try {
-      return await getGeminiResponse(message, context, reasoningMode);
+      return await getGeminiResponse(message, context);
     } catch (error) {
       if (i === maxRetries - 1) throw error;
       console.log(`Retry ${i + 1} after error:`, error.message);
@@ -193,9 +185,9 @@ async function getGeminiResponseWithRetry(message, context = '', reasoningMode =
   }
 }
 
-async function getGeminiResponse(message, context = '', reasoningMode = false) {
+async function getGeminiResponse(message, context = '') {
   try {
-    console.log('Sending message to Gemini 2.5 Flash-Lite...')
+    console.log('Sending message to Gemini 2.5 Flash-Lite with reasoning...')
     
     // Get the API key from environment variables
     const apiKey = GEMINI_API_KEY
@@ -209,15 +201,10 @@ async function getGeminiResponse(message, context = '', reasoningMode = false) {
       fullPrompt = `Context: ${context}\n\nUser: ${message}\n\nPlease respond to the user's message based on the provided context.`
     }
     
-    // Add reasoning instruction if enabled
-    if (reasoningMode) {
-      fullPrompt = `Please provide a step-by-step reasoning for your answer before giving the final response.\n\n${fullPrompt}`
-    }
-    
     // Truncate very long messages to prevent timeouts on free tier
     const truncatedPrompt = fullPrompt.length > 300 ? fullPrompt.substring(0, 300) + "..." : fullPrompt;
     
-    // Prepare the request body for Gemini API with optimized settings
+    // Prepare the request body for Gemini API with reasoning enabled
     const requestBody = {
       contents: [
         {
@@ -228,10 +215,11 @@ async function getGeminiResponse(message, context = '', reasoningMode = false) {
           ]
         }
       ],
+      // Add system instruction for enhanced reasoning
       systemInstruction: {
         parts: [
           {
-            text: "You are a helpful AI assistant with advanced reasoning capabilities. When asked complex questions, break down your thinking process step by step before providing the final answer."
+            text: "You are an AI assistant with advanced reasoning capabilities. When answering questions, think step by step, analyze the problem carefully, and provide well-reasoned responses. Break down complex problems into manageable parts, consider multiple perspectives, and explain your thought process clearly."
           }
         ]
       },
