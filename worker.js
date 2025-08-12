@@ -51,9 +51,13 @@ async function handleUpdate(update) {
     // Handle /start command
     if (text === '/start') {
       await sendMessage(chatId, 
-        `🤖 <b>Gemini 1.0 Pro Chat Bot</b>\n\n` +
-        `Hello! I'm powered by Google's Gemini 1.0 Pro model. Send me any message and I'll respond as an AI assistant.\n\n` +
-        `You can ask me questions, request help with tasks, or just have a conversation!`
+        `🤖 <b>Gemini 2.5 Pro Chat Bot</b>\n\n` +
+        `Hello! I'm powered by Google's Gemini 2.5 Pro model. Send me any message and I'll respond as an AI assistant.\n\n` +
+        `Commands:\n` +
+        `/start - Welcome message\n` +
+        `/help - Show this help message\n` +
+        `/reasoning - Toggle reasoning mode\n\n` +
+        `Just send me any text message and I'll respond as an AI assistant.`
       )
       return
     }
@@ -64,8 +68,23 @@ async function handleUpdate(update) {
         `📖 <b>Help</b>\n\n` +
         `Available commands:\n` +
         `/start - Welcome message\n` +
-        `/help - Show this help message\n\n` +
+        `/help - Show this help message\n` +
+        `/reasoning - Toggle reasoning mode\n\n` +
         `Just send me any text message and I'll respond as an AI assistant.`
+      )
+      return
+    }
+    
+    // Handle /reasoning command
+    if (text === '/reasoning') {
+      const currentMode = await getReasoningMode(chatId)
+      const newMode = !currentMode
+      await setReasoningMode(chatId, newMode)
+      
+      await sendMessage(chatId, 
+        `🧠 <b>Reasoning Mode</b>\n\n` +
+        `Reasoning mode is now ${newMode ? 'enabled' : 'disabled'}.\n\n` +
+        `When enabled, I'll provide step-by-step reasoning for my answers. This may take slightly longer but provides more detailed explanations.`
       )
       return
     }
@@ -76,7 +95,7 @@ async function handleUpdate(update) {
       await sendChatAction(chatId, 'typing')
       
       // Get response from Gemini with retry logic
-      const aiResponse = await getGeminiResponseWithRetry(text)
+      const aiResponse = await getGeminiResponseWithRetry(chatId, text)
       
       // Send the response back to the user
       await sendMessage(chatId, aiResponse)
@@ -91,10 +110,31 @@ async function handleUpdate(update) {
   }
 }
 
-async function getGeminiResponseWithRetry(message, maxRetries = 2) {
+// KV storage functions for reasoning mode
+async function getReasoningMode(chatId) {
+  try {
+    const key = `reasoning:${chatId}`
+    const value = await BOT_CACHE.get(key)
+    return value === 'true'
+  } catch (error) {
+    console.error('Error getting reasoning mode:', error)
+    return false // Default to disabled
+  }
+}
+
+async function setReasoningMode(chatId, enabled) {
+  try {
+    const key = `reasoning:${chatId}`
+    await BOT_CACHE.put(key, enabled.toString(), { expirationTtl: 86400 * 30 }) // 30 days
+  } catch (error) {
+    console.error('Error setting reasoning mode:', error)
+  }
+}
+
+async function getGeminiResponseWithRetry(chatId, message, maxRetries = 2) {
   for (let i = 0; i < maxRetries; i++) {
     try {
-      return await getGeminiResponse(message);
+      return await getGeminiResponse(chatId, message);
     } catch (error) {
       if (i === maxRetries - 1) throw error;
       console.log(`Retry ${i + 1} after error:`, error.message);
@@ -103,15 +143,18 @@ async function getGeminiResponseWithRetry(message, maxRetries = 2) {
   }
 }
 
-async function getGeminiResponse(message) {
+async function getGeminiResponse(chatId, message) {
   try {
-    console.log('Sending message to Gemini 1.0 Pro...')
+    console.log('Sending message to Gemini 2.5 Pro...')
     
     // Get the API key from environment variables
     const apiKey = GEMINI_API_KEY
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY environment variable is not set')
     }
+    
+    // Get user's reasoning mode preference
+    const reasoningMode = await getReasoningMode(chatId)
     
     // Truncate very long messages to prevent timeouts on free tier
     const truncatedMessage = message.length > 300 ? message.substring(0, 300) + "..." : message;
@@ -153,19 +196,42 @@ async function getGeminiResponse(message) {
       ]
     }
     
-    // Make the request to Gemini 1.0 Pro API with shorter timeout
-    const response = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'Gemini Telegram Bot'
+    // Add reasoning mode if enabled
+    if (reasoningMode) {
+      requestBody.reasoning_mode = "enabled"
+    }
+    
+    // Try Gemini 2.5 Pro first
+    let response
+    try {
+      response = await fetchWithTimeout(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-03-18:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Gemini Telegram Bot'
+          },
+          body: JSON.stringify(requestBody)
         },
-        body: JSON.stringify(requestBody)
-      },
-      10000 // 10 second timeout for free tier
-    )
+        15000 // 15 second timeout
+      )
+    } catch (error) {
+      console.log('Gemini 2.5 Pro not available, falling back to Gemini 1.5 Pro')
+      // Fall back to Gemini 1.5 Pro if 2.5 Pro fails
+      response = await fetchWithTimeout(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Gemini Telegram Bot'
+          },
+          body: JSON.stringify(requestBody)
+        },
+        15000 // 15 second timeout
+      )
+    }
     
     if (!response.ok) {
       const errorText = await response.text()
