@@ -51,8 +51,8 @@ async function handleUpdate(update) {
     // Handle /start command
     if (text === '/start') {
       await sendMessage(chatId, 
-        `🤖 <b>Gemini 2.5 Flash-Lite Chat Bot</b>\n\n` +
-        `Hello! I'm powered by Google's Gemini 2.5 Flash-Lite model. Send me any message and I'll respond as an AI assistant.\n\n` +
+        `🤖 <b>Gemini 1.5 Flash Chat Bot</b>\n\n` +
+        `Hello! I'm powered by Google's stable Gemini 1.5 Flash model. Send me any message and I'll respond as an AI assistant.\n\n` +
         `You can ask me questions, request help with tasks, or just have a conversation!`
       )
       return
@@ -88,7 +88,7 @@ async function handleUpdate(update) {
 
 async function getGeminiResponse(message) {
   try {
-    console.log('Sending message to Gemini 2.5 Flash-Lite...')
+    console.log('Sending message to Gemini 1.5 Flash...')
     
     // Get the API key from environment variables
     const apiKey = GEMINI_API_KEY
@@ -115,9 +115,9 @@ async function getGeminiResponse(message) {
       }
     }
     
-    // Make the request to Gemini 2.5 Flash-Lite API
+    // Make the request to Gemini 1.5 Flash API (stable version)
     const response = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-03-18:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
