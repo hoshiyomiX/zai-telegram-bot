@@ -50,36 +50,17 @@ async function handleUpdate(update) {
     
     console.log(`Message from ${chatId} (${chatType}): ${text}`)
     
+    // Handle commands first
+    if (text.startsWith('/')) {
+      await handleCommand(chatId, text)
+      return
+    }
+    
     // Check if bot should respond (private chat or summoned in group)
     const shouldRespond = chatType === 'private' || isBotSummoned(update.message, botUsername)
     
     if (!shouldRespond) {
       console.log('Bot not summoned, ignoring message')
-      return
-    }
-    
-    // Handle /start command
-    if (text === '/start') {
-      await sendMessage(chatId, 
-        `🤖 <b>Gemini 2.5 Flash-Lite Chat Bot</b>\n\n` +
-        `Hello! I'm powered by Google's Gemini 2.5 Flash-Lite model. Send me any message and I'll respond as an AI assistant.\n\n` +
-        `You can ask me questions, request help with tasks, or just have a conversation!`
-      )
-      return
-    }
-    
-    // Handle /help command
-    if (text === '/help') {
-      await sendMessage(chatId, 
-        `📖 <b>Help</b>\n\n` +
-        `Available commands:\n` +
-        `/start - Welcome message\n` +
-        `/help - Show this help message\n\n` +
-        `In groups, I only respond when:\n` +
-        `• You tag me @${botUsername}\n` +
-        `• You reply to my message\n` +
-        `• You reply to a message with a topic I should discuss`
-      )
       return
     }
     
@@ -96,7 +77,7 @@ async function handleUpdate(update) {
       }
       
       // Get response from Gemini with retry logic
-      const aiResponse = await getGeminiResponseWithRetry(text, context)
+      const aiResponse = await getGeminiResponseWithRetry(chatId, text, context)
       
       // Send the response back to the user
       await sendMessage(chatId, aiResponse)
@@ -111,11 +92,78 @@ async function handleUpdate(update) {
   }
 }
 
+// Handle bot commands
+async function handleCommand(chatId, text) {
+  const command = text.split(' ')[0]
+  
+  switch (command) {
+    case '/start':
+      await sendMessage(chatId, 
+        `🤖 <b>Gemini 2.5 Flash-Lite Chat Bot</b>\n\n` +
+        `Hello! I'm powered by Google's Gemini 2.5 Flash-Lite model. Send me any message and I'll respond as an AI assistant.\n\n` +
+        `You can ask me questions, request help with tasks, or just have a conversation!`
+      )
+      break
+      
+    case '/help':
+      await sendMessage(chatId, 
+        `📖 <b>Help</b>\n\n` +
+        `Available commands:\n` +
+        `/start - Welcome message\n` +
+        `/help - Show this help message\n` +
+        `/reasoning - Toggle reasoning features on/off\n\n` +
+        `In groups, I only respond when:\n` +
+        `• You tag me @${TELEGRAM_BOT_USERNAME || 'your_bot_username'}\n` +
+        `• You reply to my message\n` +
+        `• You reply to a message with a topic I should discuss`
+      )
+      break
+      
+    case '/reasoning':
+      await toggleReasoning(chatId)
+      break
+      
+    default:
+      // Unknown command, but if it's a group and bot is summoned, process as normal message
+      if (text.includes(`@${TELEGRAM_BOT_USERNAME || 'your_bot_username'}`)) {
+        const cleanText = text.replace(`@${TELEGRAM_BOT_USERNAME || 'your_bot_username'}`, '').trim()
+        if (cleanText) {
+          await sendChatAction(chatId, 'typing')
+          const aiResponse = await getGeminiResponseWithRetry(chatId, cleanText)
+          await sendMessage(chatId, aiResponse)
+        }
+      }
+      break
+  }
+}
+
+// Toggle reasoning mode for a chat
+async function toggleReasoning(chatId) {
+  try {
+    const reasoningKey = `reasoning:${chatId}`
+    const currentMode = await BOT_CACHE.get(reasoningKey)
+    const newMode = currentMode === 'enabled' ? 'disabled' : 'enabled'
+    
+    // Save new mode with 30 day expiration
+    await BOT_CACHE.put(reasoningKey, newMode, { expirationTtl: 2592000 })
+    
+    const statusMessage = newMode === 'enabled' 
+      ? `✅ Reasoning features have been <b>enabled</b>. I'll now provide more detailed, step-by-step explanations.`
+      : `❌ Reasoning features have been <b>disabled</b>. I'll provide more concise responses.`
+    
+    await sendMessage(chatId, statusMessage)
+  } catch (error) {
+    console.error('Error toggling reasoning mode:', error)
+    await sendMessage(chatId, "Sorry, I couldn't toggle reasoning mode right now. Please try again later.")
+  }
+}
+
 // Check if bot should respond to the message
 function isBotSummoned(message, botUsername) {
   // Check if message is a reply to bot's message
   if (message.reply_to_message && message.reply_to_message.from && 
       message.reply_to_message.from.username === botUsername) {
+    console.log('Bot summoned: reply to bot message')
     return true
   }
   
@@ -125,6 +173,7 @@ function isBotSummoned(message, botUsername) {
       if (entity.type === 'mention') {
         const mention = message.text.substring(entity.offset, entity.offset + entity.length)
         if (mention === `@${botUsername}`) {
+          console.log('Bot summoned: mention found')
           return true
         }
       }
@@ -133,17 +182,18 @@ function isBotSummoned(message, botUsername) {
   
   // Check if message is a reply to a message with a topic
   if (message.reply_to_message && message.reply_to_message.text) {
-    // We'll consider any reply as a potential context request
+    console.log('Bot summoned: reply to message with context')
     return true
   }
   
+  console.log('Bot not summoned')
   return false
 }
 
-async function getGeminiResponseWithRetry(message, context = '', maxRetries = 2) {
+async function getGeminiResponseWithRetry(chatId, message, context = '', maxRetries = 2) {
   for (let i = 0; i < maxRetries; i++) {
     try {
-      return await getGeminiResponse(message, context);
+      return await getGeminiResponse(chatId, message, context);
     } catch (error) {
       if (i === maxRetries - 1) throw error;
       console.log(`Retry ${i + 1} after error:`, error.message);
@@ -152,7 +202,7 @@ async function getGeminiResponseWithRetry(message, context = '', maxRetries = 2)
   }
 }
 
-async function getGeminiResponse(message, context = '') {
+async function getGeminiResponse(chatId, message, context = '') {
   try {
     console.log('Sending message to Gemini 2.5 Flash-Lite...')
     
@@ -161,6 +211,11 @@ async function getGeminiResponse(message, context = '') {
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY environment variable is not set')
     }
+    
+    // Check reasoning mode for this chat
+    const reasoningKey = `reasoning:${chatId}`
+    const reasoningMode = await BOT_CACHE.get(reasoningKey) || 'disabled'
+    console.log(`Reasoning mode for chat ${chatId}: ${reasoningMode}`)
     
     // Prepare the full prompt with context if available
     let fullPrompt = message
@@ -186,8 +241,10 @@ async function getGeminiResponse(message, context = '') {
         temperature: 0.7,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 1024, // Reduced to generate shorter responses faster
+        maxOutputTokens: reasoningMode === 'enabled' ? 2048 : 1024, // More tokens for reasoning mode
       },
+      // Add reasoning mode parameter
+      ...(reasoningMode === 'enabled' && { reasoning_mode: "enabled" }),
       safetySettings: [
         {
           category: "HARM_CATEGORY_HARASSMENT",
@@ -219,7 +276,7 @@ async function getGeminiResponse(message, context = '') {
         },
         body: JSON.stringify(requestBody)
       },
-      10000 // 10 second timeout for free tier
+      reasoningMode === 'enabled' ? 15000 : 10000 // Longer timeout for reasoning mode
     )
     
     if (!response.ok) {
