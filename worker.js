@@ -7,7 +7,7 @@ async function handleRequest(event) {
   
   // Handle GET requests (for webhook verification)
   if (request.method === 'GET') {
-    return new Response('Z.ai Telegram Bot is running!')
+    return new Response('Gemini Telegram Bot is running!')
   }
   
   // Handle POST requests (for Telegram updates)
@@ -51,8 +51,8 @@ async function handleUpdate(update) {
     // Handle /start command
     if (text === '/start') {
       await sendMessage(chatId, 
-        `🤖 <b>Z.ai Chat Bot</b>\n\n` +
-        `Hello! I'm powered by Z.ai's GLM-4.5-Flash model. Send me any message and I'll respond as an AI assistant.\n\n` +
+        `🤖 <b>Gemini 2.5 Flash-Lite Chat Bot</b>\n\n` +
+        `Hello! I'm powered by Google's Gemini 2.5 Flash-Lite model. Send me any message and I'll respond as an AI assistant.\n\n` +
         `You can ask me questions, request help with tasks, or just have a conversation!`
       )
       return
@@ -70,13 +70,13 @@ async function handleUpdate(update) {
       return
     }
     
-    // If the message is not empty, send it to Z.ai
+    // If the message is not empty, send it to Gemini
     if (text.trim() !== '') {
       // Send a "typing" indicator to show the bot is thinking
       await sendChatAction(chatId, 'typing')
       
-      // Get response from Z.ai
-      const aiResponse = await getZaiResponse(text)
+      // Get response from Gemini
+      const aiResponse = await getGeminiResponse(text)
       
       // Send the response back to the user
       await sendMessage(chatId, aiResponse)
@@ -86,63 +86,69 @@ async function handleUpdate(update) {
   }
 }
 
-async function getZaiResponse(message) {
+async function getGeminiResponse(message) {
   try {
-    console.log('Sending message to Z.ai...')
+    console.log('Sending message to Gemini 2.5 Flash-Lite...')
     
     // Get the API key from environment variables
-    const apiKey = ZAI_API_KEY
+    const apiKey = GEMINI_API_KEY
     if (!apiKey) {
-      throw new Error('ZAI_API_KEY environment variable is not set')
+      throw new Error('GEMINI_API_KEY environment variable is not set')
     }
     
-    // Prepare the request body for Z.ai API
-    // Using the updated endpoint and model from the template
+    // Prepare the request body for Gemini API
     const requestBody = {
-      model: "glm-4.5-flash", // Using GLM-4.5-Flash model as per the template
-      messages: [
+      contents: [
         {
-          role: "user",
-          content: message
+          parts: [
+            {
+              text: message
+            }
+          ]
         }
       ],
-      reasoning_mode: "disabled" // Disable reasoning feature to avoid concurrency issues
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 8192,
+      }
     }
     
-    // Make the request to Z.ai API using the updated endpoint
+    // Make the request to Gemini 2.5 Flash-Lite API
     const response = await fetchWithTimeout(
-      'https://api.z.ai/api/paas/v4/chat/completions', // Updated endpoint
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-03-18:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
-          'Accept-Language': 'en-US', // Added as per template
-          'Authorization': `Bearer ${apiKey}`, // Using Bearer token format
           'Content-Type': 'application/json',
-          'User-Agent': 'Z.ai Telegram Bot'
+          'User-Agent': 'Gemini Telegram Bot'
         },
         body: JSON.stringify(requestBody)
       },
-      25000 // 25 second timeout for AI responses (reduced from 30s)
+      25000 // 25 second timeout for AI responses
     )
     
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Z.ai API error:', errorText)
-      throw new Error(`Z.ai API returned ${response.status}: ${errorText}`)
+      console.error('Gemini API error:', errorText)
+      throw new Error(`Gemini API returned ${response.status}: ${errorText}`)
     }
     
     const data = await response.json()
-    console.log('Z.ai response received')
+    console.log('Gemini response received')
     
-    // Extract the AI response text from the updated response structure
-    if (data.choices && data.choices.length > 0 && data.choices[0].message) {
-      return data.choices[0].message.content
+    // Extract the AI response text from the Gemini response structure
+    if (data.candidates && data.candidates.length > 0 && 
+        data.candidates[0].content && data.candidates[0].content.parts && 
+        data.candidates[0].content.parts.length > 0) {
+      return data.candidates[0].content.parts[0].text
     } else {
-      throw new Error('Unexpected response format from Z.ai API')
+      throw new Error('Unexpected response format from Gemini API')
     }
     
   } catch (error) {
-    console.error('Error getting Z.ai response:', error)
+    console.error('Error getting Gemini response:', error)
     
     // Check if it's a timeout error
     if (error.message === 'Request timeout') {
