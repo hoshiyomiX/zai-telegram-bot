@@ -201,37 +201,19 @@ async function getGeminiResponse(chatId, message) {
       requestBody.reasoning_mode = "enabled"
     }
     
-    // Try Gemini 2.5 Pro first
-    let response
-    try {
-      response = await fetchWithTimeout(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-03-18:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'User-Agent': 'Gemini Telegram Bot'
-          },
-          body: JSON.stringify(requestBody)
+    // Use Gemini 2.5 Pro
+    const response = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Gemini Telegram Bot'
         },
-        15000 // 15 second timeout
-      )
-    } catch (error) {
-      console.log('Gemini 2.5 Pro not available, falling back to Gemini 1.5 Pro')
-      // Fall back to Gemini 1.5 Pro if 2.5 Pro fails
-      response = await fetchWithTimeout(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'User-Agent': 'Gemini Telegram Bot'
-          },
-          body: JSON.stringify(requestBody)
-        },
-        15000 // 15 second timeout
-      )
-    }
+        body: JSON.stringify(requestBody)
+      },
+      15000 // 15 second timeout
+    )
     
     if (!response.ok) {
       const errorText = await response.text()
