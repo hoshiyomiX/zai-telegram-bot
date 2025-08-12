@@ -2,6 +2,10 @@ name = "zai-telegram-bot"
 compatibility_date = "2025-08-06"
 main = "worker.js"
 
+kv_namespaces = [
+  { binding = "BOT_CACHE", id = "112ccdc301c24882819fdc5352becfa0" }
+]
+
 [vars]
 TELEGRAM_BOT_TOKEN = "8285384768:AAGXNkTZfGm4OqyDqPEV3AQR9brWC0U2GNo"
 GEMINI_API_KEY = "AIzaSyAw4ZI1o4qSIqBYmi2Eti96_kJsqJFVNWE"
