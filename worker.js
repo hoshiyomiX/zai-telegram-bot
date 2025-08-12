@@ -13,18 +13,10 @@ async function handleRequest(event) {
   // Handle POST requests (for Telegram updates)
   if (request.method === 'POST') {
     try {
-      // Clone the request to read the body
       const requestClone = request.clone()
-      
-      // Read the request body before sending response
       const update = await requestClone.json()
-      
-      // Immediately respond to Telegram to avoid timeout
       const response = new Response('OK')
-      
-      // Process the update in the background
       event.waitUntil(handleUpdate(update))
-      
       return response
     } catch (error) {
       console.error('Error handling request:', error)
@@ -37,7 +29,6 @@ async function handleRequest(event) {
 
 async function handleUpdate(update) {
   try {
-    // Check if the update contains a message
     if (!update.message) {
       console.log('No message in update')
       return
@@ -48,11 +39,11 @@ async function handleUpdate(update) {
     
     console.log(`Message from ${chatId}: ${text}`)
     
-    // Handle /start command
+    // Handle commands
     if (text === '/start') {
       await sendMessage(chatId, 
-        `🤖 <b>Gemini 2.5 Flash Chat Bot</b>\n\n` +
-        `Hello! I'm powered by Google's Gemini 2.5 Flash model. Send me any message and I'll respond as an AI assistant.\n\n` +
+        `🤖 <b>Gemini 2.5 Pro Chat Bot</b>\n\n` +
+        `Hello! I'm powered by Google's Gemini 2.5 Pro model. Send me any message and I'll respond as an AI assistant.\n\n` +
         `Commands:\n` +
         `/start - Welcome message\n` +
         `/help - Show this help message\n` +
@@ -62,7 +53,6 @@ async function handleUpdate(update) {
       return
     }
     
-    // Handle /help command
     if (text === '/help') {
       await sendMessage(chatId, 
         `📖 <b>Help</b>\n\n` +
@@ -75,7 +65,6 @@ async function handleUpdate(update) {
       return
     }
     
-    // Handle /reasoning command
     if (text === '/reasoning') {
       const currentMode = await getReasoningMode(chatId)
       const newMode = !currentMode
@@ -89,20 +78,28 @@ async function handleUpdate(update) {
       return
     }
     
-    // If the message is not empty, send it to Gemini
     if (text.trim() !== '') {
-      // Send a "typing" indicator to show the bot is thinking
+      // Check cooldown
+      const canProcess = await checkCooldown(chatId)
+      if (!canProcess) {
+        await sendMessage(chatId, "Please wait a minute before sending another request.")
+        return
+      }
+      
+      // Send typing indicator
       await sendChatAction(chatId, 'typing')
       
-      // Get response from Gemini with retry logic
+      // Get response from Gemini
       const aiResponse = await getGeminiResponseWithRetry(chatId, text)
       
-      // Send the response back to the user
+      // Send the response
       await sendMessage(chatId, aiResponse)
+      
+      // Set cooldown
+      await setCooldown(chatId)
     }
   } catch (error) {
     console.error('Error processing update:', error)
-    // Send error message to user
     const chatId = update.message?.chat.id
     if (chatId) {
       await sendMessage(chatId, "Sorry, I'm having trouble responding right now. Please try again later.")
@@ -110,7 +107,7 @@ async function handleUpdate(update) {
   }
 }
 
-// KV storage functions for reasoning mode
+// KV storage functions for reasoning mode and cooldown
 async function getReasoningMode(chatId) {
   try {
     const key = `reasoning:${chatId}`
@@ -118,92 +115,92 @@ async function getReasoningMode(chatId) {
     return value === 'true'
   } catch (error) {
     console.error('Error getting reasoning mode:', error)
-    return false // Default to disabled
+    return false
   }
 }
 
 async function setReasoningMode(chatId, enabled) {
   try {
     const key = `reasoning:${chatId}`
-    await BOT_CACHE.put(key, enabled.toString(), { expirationTtl: 86400 * 30 }) // 30 days
+    await BOT_CACHE.put(key, enabled.toString(), { expirationTtl: 86400 * 30 })
   } catch (error) {
     console.error('Error setting reasoning mode:', error)
+  }
+}
+
+async function checkCooldown(chatId) {
+  try {
+    const key = `cooldown:${chatId}`
+    const lastRequest = await BOT_CACHE.get(key)
+    if (!lastRequest) return true
+    
+    const lastTime = parseInt(lastRequest)
+    const now = Date.now()
+    const cooldownPeriod = 60 * 1000 // 1 minute in milliseconds
+    return (now - lastTime) > cooldownPeriod
+  } catch (error) {
+    console.error('Error checking cooldown:', error)
+    return true // Allow request if error checking cooldown
+  }
+}
+
+async function setCooldown(chatId) {
+  try {
+    const key = `cooldown:${chatId}`
+    await BOT_CACHE.put(key, Date.now().toString(), { expirationTtl: 60 }) // 1 minute
+  } catch (error) {
+    console.error('Error setting cooldown:', error)
   }
 }
 
 async function getGeminiResponseWithRetry(chatId, message, maxRetries = 2) {
   for (let i = 0; i < maxRetries; i++) {
     try {
-      return await getGeminiResponse(chatId, message);
+      return await getGeminiResponse(chatId, message)
     } catch (error) {
-      if (i === maxRetries - 1) throw error;
-      console.log(`Retry ${i + 1} after error:`, error.message);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (i === maxRetries - 1) throw error
+      console.log(`Retry ${i + 1} after error:`, error.message)
+      await new Promise(resolve => setTimeout(resolve, 1000))
     }
   }
 }
 
 async function getGeminiResponse(chatId, message) {
   try {
-    console.log('Sending message to Gemini 2.5 Flash...')
+    console.log('Sending message to Gemini 2.5 Pro...')
     
-    // Get the API key from environment variables
     const apiKey = GEMINI_API_KEY
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY environment variable is not set')
     }
     
-    // Get user's reasoning mode preference
     const reasoningMode = await getReasoningMode(chatId)
+    const truncatedMessage = message.length > 300 ? message.substring(0, 300) + "..." : message
     
-    // Truncate very long messages to prevent timeouts on free tier
-    const truncatedMessage = message.length > 300 ? message.substring(0, 300) + "..." : message;
-    
-    // Prepare the request body for Gemini API with optimized settings
     const requestBody = {
-      contents: [
-        {
-          parts: [
-            {
-              text: truncatedMessage
-            }
-          ]
-        }
-      ],
+      contents: [{
+        parts: [{ text: truncatedMessage }]
+      }],
       generationConfig: {
         temperature: 0.7,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 1024, // Reduced to generate shorter responses faster
+        maxOutputTokens: 1024,
       },
       safetySettings: [
-        {
-          category: "HARM_CATEGORY_HARASSMENT",
-          threshold: "BLOCK_NONE"
-        },
-        {
-          category: "HARM_CATEGORY_HATE_SPEECH", 
-          threshold: "BLOCK_NONE"
-        },
-        {
-          category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-          threshold: "BLOCK_NONE"
-        },
-        {
-          category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-          threshold: "BLOCK_NONE"
-        }
+        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
       ]
     }
     
-    // Add reasoning mode if enabled
     if (reasoningMode) {
       requestBody.reasoning_mode = "enabled"
     }
     
-    // Use Gemini 2.5 Flash
     const response = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -212,7 +209,7 @@ async function getGeminiResponse(chatId, message) {
         },
         body: JSON.stringify(requestBody)
       },
-      15000 // 15 second timeout
+      30000 // 30 second timeout
     )
     
     if (!response.ok) {
@@ -224,23 +221,16 @@ async function getGeminiResponse(chatId, message) {
     const data = await response.json()
     console.log('Gemini response received')
     
-    // Extract the AI response text from the Gemini response structure
-    if (data.candidates && data.candidates.length > 0 && 
-        data.candidates[0].content && data.candidates[0].content.parts && 
-        data.candidates[0].content.parts.length > 0) {
+    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
       return data.candidates[0].content.parts[0].text
-    } else {
-      throw new Error('Unexpected response format from Gemini API')
     }
+    throw new Error('Unexpected response format from Gemini API')
     
   } catch (error) {
     console.error('Error getting Gemini response:', error)
-    
-    // Check if it's a timeout error
     if (error.message === 'Request timeout') {
       return `Sorry, the request timed out. The AI model is taking too long to respond. Please try again with a shorter query.`
     }
-    
     return `Sorry, I encountered an error while processing your request: ${error.message}`
   }
 }
@@ -249,16 +239,15 @@ async function sendMessage(chatId, text) {
   try {
     console.log(`Sending message to ${chatId}: ${text.substring(0, 100)}...`)
     const token = TELEGRAM_BOT_TOKEN
+    const maxMessageLength = 4096
     
-    // Split long messages into chunks to avoid Telegram API limits
-    const maxMessageLength = 4096; // Telegram's max message length
     if (text.length > maxMessageLength) {
-      const chunks = splitMessage(text, maxMessageLength);
+      const chunks = splitMessage(text, maxMessageLength)
       for (const chunk of chunks) {
-        await sendSingleMessage(chatId, chunk);
+        await sendSingleMessage(chatId, chunk)
       }
     } else {
-      await sendSingleMessage(chatId, text);
+      await sendSingleMessage(chatId, text)
     }
   } catch (error) {
     console.error('Error in sendMessage:', error)
@@ -287,16 +276,14 @@ async function sendSingleMessage(chatId, text) {
 }
 
 function splitMessage(text, maxLength) {
-  const chunks = [];
+  const chunks = []
   while (text.length > 0) {
-    // Find the last space before maxLength to avoid breaking words
-    let splitIndex = text.lastIndexOf(' ', maxLength);
-    if (splitIndex === -1) splitIndex = maxLength; // No space found, split at maxLength
-    
-    chunks.push(text.substring(0, splitIndex));
-    text = text.substring(splitIndex).trim();
+    let splitIndex = text.lastIndexOf(' ', maxLength)
+    if (splitIndex === -1) splitIndex = maxLength
+    chunks.push(text.substring(0, splitIndex))
+    text = text.substring(splitIndex).trim()
   }
-  return chunks;
+  return chunks
 }
 
 async function sendChatAction(chatId, action) {
@@ -323,8 +310,7 @@ function escapeHtml(text) {
     .replace(/>/g, '&gt;')
 }
 
-// Helper function for fetch with timeout
-function fetchWithTimeout(url, options, timeout = 10000) {
+function fetchWithTimeout(url, options, timeout = 30000) {
   console.log(`Fetching ${url} with timeout ${timeout}ms`)
   return Promise.race([
     fetch(url, options),
