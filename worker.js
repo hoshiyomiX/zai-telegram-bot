@@ -45,8 +45,18 @@ async function handleUpdate(update) {
     
     const chatId = update.message.chat.id
     const text = update.message.text || ''
+    const chatType = update.message.chat.type
+    const botUsername = TELEGRAM_BOT_USERNAME || 'your_bot_username' // Set this in environment variables
     
-    console.log(`Message from ${chatId}: ${text}`)
+    console.log(`Message from ${chatId} (${chatType}): ${text}`)
+    
+    // Check if bot should respond (private chat or summoned in group)
+    const shouldRespond = chatType === 'private' || isBotSummoned(update.message, botUsername)
+    
+    if (!shouldRespond) {
+      console.log('Bot not summoned, ignoring message')
+      return
+    }
     
     // Handle /start command
     if (text === '/start') {
@@ -65,7 +75,10 @@ async function handleUpdate(update) {
         `Available commands:\n` +
         `/start - Welcome message\n` +
         `/help - Show this help message\n\n` +
-        `Just send me any text message and I'll respond as an AI assistant.`
+        `In groups, I only respond when:\n` +
+        `• You tag me @${botUsername}\n` +
+        `• You reply to my message\n` +
+        `• You reply to a message with a topic I should discuss`
       )
       return
     }
@@ -75,8 +88,15 @@ async function handleUpdate(update) {
       // Send a "typing" indicator to show the bot is thinking
       await sendChatAction(chatId, 'typing')
       
+      // Get context if replying to a message
+      let context = ''
+      if (update.message.reply_to_message && update.message.reply_to_message.text) {
+        context = update.message.reply_to_message.text
+        console.log(`Replying to context: ${context.substring(0, 100)}...`)
+      }
+      
       // Get response from Gemini with retry logic
-      const aiResponse = await getGeminiResponseWithRetry(text)
+      const aiResponse = await getGeminiResponseWithRetry(text, context)
       
       // Send the response back to the user
       await sendMessage(chatId, aiResponse)
@@ -91,10 +111,39 @@ async function handleUpdate(update) {
   }
 }
 
-async function getGeminiResponseWithRetry(message, maxRetries = 2) {
+// Check if bot should respond to the message
+function isBotSummoned(message, botUsername) {
+  // Check if message is a reply to bot's message
+  if (message.reply_to_message && message.reply_to_message.from && 
+      message.reply_to_message.from.username === botUsername) {
+    return true
+  }
+  
+  // Check if message contains bot mention
+  if (message.entities) {
+    for (const entity of message.entities) {
+      if (entity.type === 'mention') {
+        const mention = message.text.substring(entity.offset, entity.offset + entity.length)
+        if (mention === `@${botUsername}`) {
+          return true
+        }
+      }
+    }
+  }
+  
+  // Check if message is a reply to a message with a topic
+  if (message.reply_to_message && message.reply_to_message.text) {
+    // We'll consider any reply as a potential context request
+    return true
+  }
+  
+  return false
+}
+
+async function getGeminiResponseWithRetry(message, context = '', maxRetries = 2) {
   for (let i = 0; i < maxRetries; i++) {
     try {
-      return await getGeminiResponse(message);
+      return await getGeminiResponse(message, context);
     } catch (error) {
       if (i === maxRetries - 1) throw error;
       console.log(`Retry ${i + 1} after error:`, error.message);
@@ -103,7 +152,7 @@ async function getGeminiResponseWithRetry(message, maxRetries = 2) {
   }
 }
 
-async function getGeminiResponse(message) {
+async function getGeminiResponse(message, context = '') {
   try {
     console.log('Sending message to Gemini 2.5 Flash-Lite...')
     
@@ -113,8 +162,14 @@ async function getGeminiResponse(message) {
       throw new Error('GEMINI_API_KEY environment variable is not set')
     }
     
+    // Prepare the full prompt with context if available
+    let fullPrompt = message
+    if (context) {
+      fullPrompt = `Context: ${context}\n\nUser: ${message}\n\nPlease respond to the user's message based on the provided context.`
+    }
+    
     // Truncate very long messages to prevent timeouts on free tier
-    const truncatedMessage = message.length > 300 ? message.substring(0, 300) + "..." : message;
+    const truncatedPrompt = fullPrompt.length > 300 ? fullPrompt.substring(0, 300) + "..." : fullPrompt;
     
     // Prepare the request body for Gemini API with optimized settings
     const requestBody = {
@@ -122,7 +177,7 @@ async function getGeminiResponse(message) {
         {
           parts: [
             {
-              text: truncatedMessage
+              text: truncatedPrompt
             }
           ]
         }
