@@ -51,8 +51,8 @@ async function handleUpdate(update) {
     // Handle /start command
     if (text === '/start') {
       await sendMessage(chatId, 
-        `🤖 <b>Gemini 2.5 Pro Chat Bot</b>\n\n` +
-        `Hello! I'm powered by Google's Gemini 2.5 Pro model. Send me any message and I'll respond as an AI assistant.\n\n` +
+        `🤖 <b>Gemini 2.5 Flash Chat Bot</b>\n\n` +
+        `Hello! I'm powered by Google's Gemini 2.5 Flash model. Send me any message and I'll respond as an AI assistant.\n\n` +
         `Commands:\n` +
         `/start - Welcome message\n` +
         `/help - Show this help message\n` +
@@ -145,7 +145,7 @@ async function getGeminiResponseWithRetry(chatId, message, maxRetries = 2) {
 
 async function getGeminiResponse(chatId, message) {
   try {
-    console.log('Sending message to Gemini 2.5 Pro...')
+    console.log('Sending message to Gemini 2.5 Flash...')
     
     // Get the API key from environment variables
     const apiKey = GEMINI_API_KEY
@@ -201,37 +201,19 @@ async function getGeminiResponse(chatId, message) {
       requestBody.reasoning_mode = "enabled"
     }
     
-    // Try Gemini 2.5 Pro first
-    let response
-    try {
-      response = await fetchWithTimeout(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-03-18:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'User-Agent': 'Gemini Telegram Bot'
-          },
-          body: JSON.stringify(requestBody)
+    // Use Gemini 2.5 Flash
+    const response = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Gemini Telegram Bot'
         },
-        15000 // 15 second timeout
-      )
-    } catch (error) {
-      console.log('Gemini 2.5 Pro not available, falling back to Gemini 1.5 Pro')
-      // Fall back to Gemini 1.5 Pro if 2.5 Pro fails
-      response = await fetchWithTimeout(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'User-Agent': 'Gemini Telegram Bot'
-          },
-          body: JSON.stringify(requestBody)
-        },
-        15000 // 15 second timeout
-      )
-    }
+        body: JSON.stringify(requestBody)
+      },
+      15000 // 15 second timeout
+    )
     
     if (!response.ok) {
       const errorText = await response.text()
