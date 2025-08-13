@@ -145,7 +145,7 @@ async function getGeminiResponseWithRetry(chatId, message, maxRetries = 2) {
 
 async function getGeminiResponse(chatId, message) {
   try {
-    console.log('Sending message to Gemini 2.5 Pro...')
+    console.log('Sending message to Gemini 2.5 Flash...')
     
     // Get the API key from environment variables
     const apiKey = GEMINI_API_KEY
