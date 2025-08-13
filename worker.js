@@ -51,8 +51,8 @@ async function handleUpdate(update) {
     // Handle /start command
     if (text === '/start') {
       await sendMessage(chatId, 
-        `🤖 <b>Gemini 2.5 Pro Chat Bot</b>\n\n` +
-        `Hello! I'm powered by Google's Gemini 2.5 Pro model. Send me any message and I'll respond as an AI assistant.\n\n` +
+        `🤖 <b>Gemini 2.5 Flash Chat Bot</b>\n\n` +
+        `Hello! I'm powered by Google's Gemini 2.5 Flash model. Send me any message and I'll respond as an AI assistant.\n\n` +
         `Commands:\n` +
         `/start - Welcome message\n` +
         `/help - Show this help message\n` +
@@ -201,9 +201,9 @@ async function getGeminiResponse(chatId, message) {
       requestBody.reasoning_mode = "enabled"
     }
     
-    // Use Gemini 2.5 Pro
+    // Use Gemini 2.5 Flash
     const response = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
