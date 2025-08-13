@@ -196,9 +196,16 @@ async function getGeminiResponse(chatId, message) {
       ]
     }
     
-    // Add reasoning mode if enabled
+    // Add thinking config if reasoning mode is enabled
     if (reasoningMode) {
-      requestBody.reasoning_mode = "enabled"
+      requestBody.generationConfig.thinkingConfig = {
+        includeThoughts: true,
+        thinkingBudget: -1  // Dynamic thinking
+      };
+    } else {
+      requestBody.generationConfig.thinkingConfig = {
+        thinkingBudget: 0  // Disable thinking
+      };
     }
     
     // Use Gemini 2.5 Flash
@@ -224,11 +231,12 @@ async function getGeminiResponse(chatId, message) {
     const data = await response.json()
     console.log('Gemini response received')
     
-    // Extract the AI response text from the Gemini response structure
+    // Extract the AI response text from the Gemini response structure, handling multiple parts (e.g., thoughts + answer)
     if (data.candidates && data.candidates.length > 0 && 
         data.candidates[0].content && data.candidates[0].content.parts && 
         data.candidates[0].content.parts.length > 0) {
-      return data.candidates[0].content.parts[0].text
+      // Join all text parts with newlines for multi-part responses (e.g., reasoning steps)
+      return data.candidates[0].content.parts.map(part => part.text).join('\n\n');
     } else {
       throw new Error('Unexpected response format from Gemini API')
     }
