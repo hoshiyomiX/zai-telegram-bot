@@ -67,3 +67,311 @@ async function handleUpdate(update) {
       }
       // Check if replied to bot's message
       if (update.message.reply_to_message && update.message.reply_to_message.from.id === BOT_ID) {
+        shouldRespond = true
+      }
+    }
+    
+    // Handle commands regardless, but check if directed to bot in groups
+    if (text.startsWith('/')) {
+      let commandText = text.split(' ')[0].toLowerCase()
+      if (isGroup && commandText.includes('@')) {
+        const commandUsername = commandText.split('@')[1].toLowerCase()
+        if (commandUsername !== BOT_USERNAME.toLowerCase()) {
+          return // Command not for this bot
+        }
+        commandText = commandText.split('@')[0] // Remove @part
+      }
+      
+      if (commandText === '/start') {
+        await sendMessage(chatId, 
+          `🤖 <b>Gemini 2.5 Flash Chat Bot</b>\n\n` +
+          `Hello! I'm powered by Google's Gemini 2.5 Flash model. Send me any message and I'll respond as an AI assistant.\n\n` +
+          `Commands:\n` +
+          `/start - Welcome message\n` +
+          `/help - Show this help message\n\n` +
+          `Just send me any text message and I'll respond as an AI assistant.`
+        )
+        return
+      }
+      
+      if (commandText === '/help') {
+        await sendMessage(chatId, 
+          `📖 <b>Help</b>\n\n` +
+          `Available commands:\n` +
+          `/start - Welcome message\n` +
+          `/help - Show this help message\n\n` +
+          `Just send me any text message and I'll respond as an AI assistant.`
+        )
+        return
+      }
+    }
+    
+    // For non-command messages, check if should respond
+    if (!shouldRespond) {
+      console.log('Ignoring message in group: not tagged or replied to bot')
+      return
+    }
+    
+    // If the message is not empty, send it to Gemini
+    if (text.trim() !== '') {
+      // Send a "Thinking..." message to show the bot is processing
+      const thinkingMessage = await sendTemporaryMessage(chatId, "🤖 Thinking...")
+      
+      // Get response from Gemini
+      const aiResponse = await getGeminiResponse(chatId, text, update)
+      
+      // Delete the "Thinking..." message
+      if (thinkingMessage && thinkingMessage.ok) {
+        await deleteMessage(chatId, thinkingMessage.result.message_id)
+      }
+      
+      // Send the response back to the user
+      await sendMessage(chatId, aiResponse)
+    }
+  } catch (error) {
+    console.error('Error processing update:', error)
+    // Send error message to user
+    const chatId = update.message?.chat.id
+    if (chatId) {
+      await sendMessage(chatId, "Sorry, I'm having trouble responding right now. Please try again later.")
+    }
+  }
+}
+
+async function getGeminiResponse(chatId, message, update) {
+  try {
+    console.log('Sending message to Gemini 2.5 Flash...')
+    
+    // Get the API key from environment variables
+    const apiKey = GEMINI_API_KEY
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY environment variable is not set')
+    }
+    
+    // Truncate very long messages to prevent timeouts on free tier
+    const truncatedMessage = message.length > 300 ? message.substring(0, 300) + "..." : message;
+    
+    // Prepare the contents array
+    let contents = [
+      {
+        parts: [
+          {
+            text: truncatedMessage
+          }
+        ]
+      }
+    ];
+    
+    // If this is a reply, add context from the replied message
+    if (update.message.reply_to_message) {
+      const repliedText = update.message.reply_to_message.text || '';
+      const repliedFrom = update.message.reply_to_message.from.is_bot ? 'AI:' : 'User:';
+      const contextText = `Context from previous message:\n${repliedFrom} ${repliedText}\n\nUser: ${truncatedMessage}`;
+      
+      contents = [
+        {
+          parts: [
+            {
+              text: contextText
+            }
+          ]
+        }
+      ];
+    }
+    
+    // Prepare the request body for Gemini API with optimized settings
+    const requestBody = {
+      contents: contents,
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 1024, // Reduced to generate shorter responses faster
+      },
+      safetySettings: [
+        {
+          category: "HARM_CATEGORY_HARASSMENT",
+          threshold: "BLOCK_NONE"
+        },
+        {
+          category: "HARM_CATEGORY_HATE_SPEECH", 
+          threshold: "BLOCK_NONE"
+        },
+        {
+          category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+          threshold: "BLOCK_NONE"
+        },
+        {
+          category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+          threshold: "BLOCK_NONE"
+        }
+      ]
+    }
+    
+    // Use Gemini 2.5 Flash - removed timeout to let API complete
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Gemini Telegram Bot'
+        },
+        body: JSON.stringify(requestBody)
+      }
+    )
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Gemini API error:', errorText)
+      throw new Error(`Gemini API returned ${response.status}: ${errorText}`)
+    }
+    
+    const data = await response.json()
+    console.log('Gemini response received:', JSON.stringify(data))
+    
+    // Extract the AI response text from the Gemini response structure
+    if (data.candidates && data.candidates.length > 0 && 
+        data.candidates[0].content && data.candidates[0].content.parts && 
+        data.candidates[0].content.parts.length > 0) {
+      return data.candidates[0].content.parts[0].text
+    } else {
+      // Log the full response for debugging
+      console.error('Unexpected response format from Gemini API:', JSON.stringify(data))
+      throw new Error('Unexpected response format from Gemini API')
+    }
+    
+  } catch (error) {
+    console.error('Error getting Gemini response:', error)
+    
+    // Check if it's a timeout error
+    if (error.message === 'Request timeout') {
+      return `Sorry, the request timed out. The AI model is taking too long to respond. Please try again with a shorter query.`
+    }
+    
+    return `Sorry, I encountered an error while processing your request: ${error.message}`
+  }
+}
+
+async function sendMessage(chatId, text) {
+  try {
+    console.log(`Sending message to ${chatId}: ${text.substring(0, 100)}...`)
+    const token = TELEGRAM_BOT_TOKEN
+    
+    // Split long messages into chunks to avoid Telegram API limits
+    const maxMessageLength = 4096; // Telegram's max message length
+    if (text.length > maxMessageLength) {
+      const chunks = splitMessage(text, maxMessageLength);
+      for (const chunk of chunks) {
+        await sendSingleMessage(chatId, chunk);
+      }
+    } else {
+      await sendSingleMessage(chatId, text);
+    }
+  } catch (error) {
+    console.error('Error in sendMessage:', error)
+  }
+}
+
+async function sendSingleMessage(chatId, text) {
+  const token = TELEGRAM_BOT_TOKEN
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true
+    })
+  })
+  
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('Error sending message:', errorText)
+  } else {
+    console.log('Message sent successfully')
+  }
+}
+
+async function sendTemporaryMessage(chatId, text) {
+  try {
+    const token = TELEGRAM_BOT_TOKEN
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: text,
+        parse_mode: 'HTML'
+      })
+    })
+    
+    if (!response.ok) {
+      console.error('Error sending temporary message:', await response.text())
+      return null
+    }
+    
+    return await response.json()
+  } catch (error) {
+    console.error('Error in sendTemporaryMessage:', error)
+    return null
+  }
+}
+
+async function deleteMessage(chatId, messageId) {
+  try {
+    const token = TELEGRAM_BOT_TOKEN
+    const response = await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId
+      })
+    })
+    
+    if (!response.ok) {
+      console.error('Error deleting message:', await response.text())
+    }
+  } catch (error) {
+    console.error('Error in deleteMessage:', error)
+  }
+}
+
+function splitMessage(text, maxLength) {
+  const chunks = [];
+  while (text.length > 0) {
+    // Find the last space before maxLength to avoid breaking words
+    let splitIndex = text.lastIndexOf(' ', maxLength);
+    if (splitIndex === -1) splitIndex = maxLength; // No space found, split at maxLength
+    
+    chunks.push(text.substring(0, splitIndex));
+    text = text.substring(splitIndex).trim();
+  }
+  return chunks;
+}
+
+async function sendChatAction(chatId, action) {
+  try {
+    const token = TELEGRAM_BOT_TOKEN
+    await fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        action: action
+      })
+    })
+  } catch (error) {
+    console.error('Error sending chat action:', error)
+  }
+}
+
+function escapeHtml(text) {
+  if (!text) return ''
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
