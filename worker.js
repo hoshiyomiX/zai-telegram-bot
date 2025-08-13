@@ -196,15 +196,9 @@ async function getGeminiResponse(chatId, message) {
       ]
     }
     
-    // Add system instruction for reasoning mode if enabled
+    // Add reasoning mode if enabled
     if (reasoningMode) {
-      requestBody.systemInstruction = {
-        parts: [
-          {
-            text: "You are a helpful AI assistant that thinks step-by-step before answering. Provide detailed reasoning in your responses."
-          }
-        ]
-      }
+      requestBody.reasoning_mode = "enabled"
     }
     
     // Use Gemini 2.5 Pro
@@ -228,7 +222,7 @@ async function getGeminiResponse(chatId, message) {
     }
     
     const data = await response.json()
-    console.log('Gemini response received:', JSON.stringify(data, null, 2)) // Added logging for debugging
+    console.log('Gemini response received')
     
     // Extract the AI response text from the Gemini response structure
     if (data.candidates && data.candidates.length > 0 && 
