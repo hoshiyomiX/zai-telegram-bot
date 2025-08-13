@@ -45,57 +45,85 @@ async function handleUpdate(update) {
     
     const chatId = update.message.chat.id
     const text = update.message.text || ''
+    const chatType = update.message.chat.type
+    const isGroup = chatType === 'group' || chatType === 'supergroup'
     
     console.log(`Message from ${chatId}: ${text}`)
     
-    // Handle /start command
-    if (text === '/start') {
-      await sendMessage(chatId, 
-        `🤖 <b>Gemini 2.5 Flash Chat Bot</b>\n\n` +
-        `Hello! I'm powered by Google's Gemini 2.5 Flash model. Send me any message and I'll respond as an AI assistant.\n\n` +
-        `Commands:\n` +
-        `/start - Welcome message\n` +
-        `/help - Show this help message\n` +
-        `/reasoning - Toggle reasoning mode\n\n` +
-        `Just send me any text message and I'll respond as an AI assistant.`
-      )
-      return
+    // Extract bot ID from token
+    const BOT_ID = TELEGRAM_BOT_TOKEN.split(':')[0]
+    
+    // Assume BOT_USERNAME is set as an environment variable or hardcode it here
+    // For example: const BOT_USERNAME = 'YourBotUsername' // without @
+    const BOT_USERNAME = TELEGRAM_BOT_USERNAME // Assuming it's defined in environment variables
+    
+    // Determine if should respond in groups
+    let shouldRespond = !isGroup // Always respond in private chats
+    
+    if (isGroup) {
+      // Check if mentioned/tagged
+      if (text.toLowerCase().includes(`@${BOT_USERNAME.toLowerCase()}`)) {
+        shouldRespond = true
+      }
+      // Check if replied to bot's message
+      if (update.message.reply_to_message && update.message.reply_to_message.from.id === BOT_ID) {
+        shouldRespond = true
+      }
     }
     
-    // Handle /help command
-    if (text === '/help') {
-      await sendMessage(chatId, 
-        `📖 <b>Help</b>\n\n` +
-        `Available commands:\n` +
-        `/start - Welcome message\n` +
-        `/help - Show this help message\n` +
-        `/reasoning - Toggle reasoning mode\n\n` +
-        `Just send me any text message and I'll respond as an AI assistant.`
-      )
-      return
-    }
-    
-    // Handle /reasoning command
-    if (text === '/reasoning') {
-      const currentMode = await getReasoningMode(chatId)
-      const newMode = !currentMode
-      await setReasoningMode(chatId, newMode)
+    // Handle commands regardless, but check if directed to bot in groups
+    if (text.startsWith('/')) {
+      let commandText = text.split(' ')[0].toLowerCase()
+      if (isGroup && commandText.includes('@')) {
+        const commandUsername = commandText.split('@')[1].toLowerCase()
+        if (commandUsername !== BOT_USERNAME.toLowerCase()) {
+          return // Command not for this bot
+        }
+        commandText = commandText.split('@')[0] // Remove @part
+      }
       
-      await sendMessage(chatId, 
-        `🧠 <b>Reasoning Mode</b>\n\n` +
-        `Reasoning mode is now ${newMode ? 'enabled' : 'disabled'}.\n\n` +
-        `When enabled, I'll provide step-by-step reasoning for my answers. This may take slightly longer but provides more detailed explanations.`
-      )
+      if (commandText === '/start') {
+        await sendMessage(chatId, 
+          `🤖 <b>Gemini 2.5 Flash Chat Bot</b>\n\n` +
+          `Hello! I'm powered by Google's Gemini 2.5 Flash model. Send me any message and I'll respond as an AI assistant.\n\n` +
+          `Commands:\n` +
+          `/start - Welcome message\n` +
+          `/help - Show this help message\n\n` +
+          `Just send me any text message and I'll respond as an AI assistant.`
+        )
+        return
+      }
+      
+      if (commandText === '/help') {
+        await sendMessage(chatId, 
+          `📖 <b>Help</b>\n\n` +
+          `Available commands:\n` +
+          `/start - Welcome message\n` +
+          `/help - Show this help message\n\n` +
+          `Just send me any text message and I'll respond as an AI assistant.`
+        )
+        return
+      }
+    }
+    
+    // For non-command messages, check if should respond
+    if (!shouldRespond) {
+      console.log('Ignoring message in group: not tagged or replied to bot')
       return
     }
     
     // If the message is not empty, send it to Gemini
     if (text.trim() !== '') {
-      // Send a "typing" indicator to show the bot is thinking
-      await sendChatAction(chatId, 'typing')
+      // Send a "Thinking..." message to show the bot is processing
+      const thinkingMessage = await sendTemporaryMessage(chatId, "🤖 Thinking...")
       
-      // Get response from Gemini with retry logic
-      const aiResponse = await getGeminiResponseWithRetry(chatId, text)
+      // Get response from Gemini
+      const aiResponse = await getGeminiResponse(chatId, text, update)
+      
+      // Delete the "Thinking..." message
+      if (thinkingMessage && thinkingMessage.ok) {
+        await deleteMessage(chatId, thinkingMessage.result.message_id)
+      }
       
       // Send the response back to the user
       await sendMessage(chatId, aiResponse)
@@ -110,40 +138,7 @@ async function handleUpdate(update) {
   }
 }
 
-// KV storage functions for reasoning mode
-async function getReasoningMode(chatId) {
-  try {
-    const key = `reasoning:${chatId}`
-    const value = await BOT_CACHE.get(key)
-    return value === 'true'
-  } catch (error) {
-    console.error('Error getting reasoning mode:', error)
-    return false // Default to disabled
-  }
-}
-
-async function setReasoningMode(chatId, enabled) {
-  try {
-    const key = `reasoning:${chatId}`
-    await BOT_CACHE.put(key, enabled.toString(), { expirationTtl: 86400 * 30 }) // 30 days
-  } catch (error) {
-    console.error('Error setting reasoning mode:', error)
-  }
-}
-
-async function getGeminiResponseWithRetry(chatId, message, maxRetries = 2) {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await getGeminiResponse(chatId, message);
-    } catch (error) {
-      if (i === maxRetries - 1) throw error;
-      console.log(`Retry ${i + 1} after error:`, error.message);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-  }
-}
-
-async function getGeminiResponse(chatId, message) {
+async function getGeminiResponse(chatId, message, update) {
   try {
     console.log('Sending message to Gemini 2.5 Flash...')
     
@@ -153,23 +148,40 @@ async function getGeminiResponse(chatId, message) {
       throw new Error('GEMINI_API_KEY environment variable is not set')
     }
     
-    // Get user's reasoning mode preference
-    const reasoningMode = await getReasoningMode(chatId)
-    
     // Truncate very long messages to prevent timeouts on free tier
     const truncatedMessage = message.length > 300 ? message.substring(0, 300) + "..." : message;
     
-    // Prepare the request body for Gemini API with optimized settings
-    const requestBody = {
-      contents: [
+    // Prepare the contents array
+    let contents = [
+      {
+        parts: [
+          {
+            text: truncatedMessage
+          }
+        ]
+      }
+    ];
+    
+    // If this is a reply, add context from the replied message
+    if (update.message.reply_to_message) {
+      const repliedText = update.message.reply_to_message.text || '';
+      const repliedFrom = update.message.reply_to_message.from.is_bot ? 'AI:' : 'User:';
+      const contextText = `Context from previous message:\n${repliedFrom} ${repliedText}\n\nUser: ${truncatedMessage}`;
+      
+      contents = [
         {
           parts: [
             {
-              text: truncatedMessage
+              text: contextText
             }
           ]
         }
-      ],
+      ];
+    }
+    
+    // Prepare the request body for Gemini API with optimized settings
+    const requestBody = {
+      contents: contents,
       generationConfig: {
         temperature: 0.7,
         topK: 40,
@@ -194,11 +206,6 @@ async function getGeminiResponse(chatId, message) {
           threshold: "BLOCK_NONE"
         }
       ]
-    }
-    
-    // Add reasoning mode if enabled
-    if (reasoningMode) {
-      requestBody.reasoning_mode = "enabled"
     }
     
     // Use Gemini 2.5 Flash
@@ -283,6 +290,51 @@ async function sendSingleMessage(chatId, text) {
     console.error('Error sending message:', errorText)
   } else {
     console.log('Message sent successfully')
+  }
+}
+
+async function sendTemporaryMessage(chatId, text) {
+  try {
+    const token = TELEGRAM_BOT_TOKEN
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: text,
+        parse_mode: 'HTML'
+      })
+    })
+    
+    if (!response.ok) {
+      console.error('Error sending temporary message:', await response.text())
+      return null
+    }
+    
+    return await response.json()
+  } catch (error) {
+    console.error('Error in sendTemporaryMessage:', error)
+    return null
+  }
+}
+
+async function deleteMessage(chatId, messageId) {
+  try {
+    const token = TELEGRAM_BOT_TOKEN
+    const response = await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId
+      })
+    })
+    
+    if (!response.ok) {
+      console.error('Error deleting message:', await response.text())
+    }
+  } catch (error) {
+    console.error('Error in deleteMessage:', error)
   }
 }
 
