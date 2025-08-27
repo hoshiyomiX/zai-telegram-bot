@@ -47,6 +47,7 @@ async function handleUpdate(update) {
     const text = update.message.text || ''
     const chatType = update.message.chat.type
     const isGroup = chatType === 'group' || chatType === 'supergroup'
+    const userMessageId = update.message.message_id
     
     console.log(`Message from ${chatId}: ${text}`)
     
@@ -85,32 +86,51 @@ async function handleUpdate(update) {
       if (commandText === '/start') {
         await sendMessage(chatId, 
           `🤖 <b>Gemini 2.5 Flash Chat Bot</b>\n\n` +
-          `Hello! I'm powered by Google's Gemini 2.5 Flash model. Send me any message and I'll respond as an AI assistant.\n\n` +
-          `Commands:\n` +
-          `/start - Welcome message\n` +
-          `/help - Show this help message\n\n` +
-          `Formatting support:\n` +
-          `<b>Bold text</b>, <i>italic text</i>, <u>underline</u>, <s>strikethrough</s>\n` +
-          `Inline code: <code>console.log()</code>\n` +
-          `Multi-line code:\n` +
-          `<pre><code class="language-python">def hello():\n    print("Hello World")</code></pre>\n\n` +
-          `Just send me any text message and I'll respond as an AI assistant.`
+          `I'm an AI assistant powered by Google's Gemini 2.5 Flash model. I can help answer questions, explain concepts, write code, and more!\n\n` +
+          `📋 <b>Available Commands:</b>\n` +
+          `/start - Show this welcome message\n` +
+          `/help - Show help information\n` +
+          `/reset - Reset conversation context\n\n` +
+          `💡 <b>Features:</b>\n` +
+          `• Natural language conversations\n` +
+          `• Code generation in multiple languages\n` +
+          `• Text formatting (bold, italic, etc.)\n` +
+          `• Context-aware responses\n\n` +
+          `Just send me any message and I'll respond as an AI assistant!`
         )
         return
       }
       
       if (commandText === '/help') {
         await sendMessage(chatId, 
-          `📖 <b>Help</b>\n\n` +
-          `Available commands:\n` +
-          `/start - Welcome message\n` +
-          `/help - Show this help message\n\n` +
-          `Formatting support:\n` +
+          `📖 <b>Help & Features</b>\n\n` +
+          `🤖 <b>About:</b>\n` +
+          `I'm powered by Google's Gemini 2.5 Flash model, an advanced AI assistant.\n\n` +
+          `📋 <b>Commands:</b>\n` +
+          `/start - Show welcome message\n` +
+          `/help - Show this help information\n` +
+          `/reset - Reset conversation context\n\n` +
+          `💡 <b>Features:</b>\n` +
+          `• Natural language conversations\n` +
+          `• Code generation in multiple languages\n` +
+          `• Text formatting (bold, italic, etc.)\n` +
+          `• Context-aware responses\n\n` +
+          `💬 <b>Formatting Support:</b>\n` +
           `<b>Bold text</b>, <i>italic text</i>, <u>underline</u>, <s>strikethrough</s>\n` +
           `Inline code: <code>console.log()</code>\n` +
           `Multi-line code:\n` +
           `<pre><code class="language-python">def hello():\n    print("Hello World")</code></pre>\n\n` +
-          `Just send me any text message and I'll respond as an AI assistant.`
+          `Just send me any message and I'll respond as an AI assistant!`
+        )
+        return
+      }
+      
+      if (commandText === '/reset') {
+        // Reset conversation context
+        await resetConversation(chatId)
+        await sendMessage(chatId, 
+          `🔄 <b>Conversation Reset</b>\n\n` +
+          `I've forgotten our previous conversation. We can start fresh now!`
         )
         return
       }
@@ -124,19 +144,27 @@ async function handleUpdate(update) {
     
     // If the message is not empty, send it to Gemini
     if (text.trim() !== '') {
-      // Send a "Thinking..." message to show the bot is processing
-      const thinkingMessage = await sendTemporaryMessage(chatId, "🤖 Thinking...")
+      // Add reaction to user message
+      await addMessageReaction(chatId, userMessageId, '✍️')
       
-      // Get response from Gemini
-      const aiResponse = await getGeminiResponse(chatId, text, update)
-      
-      // Delete the "Thinking..." message
-      if (thinkingMessage && thinkingMessage.ok) {
-        await deleteMessage(chatId, thinkingMessage.result.message_id)
+      try {
+        // Send a "Thinking..." message to show the bot is processing
+        const thinkingMessage = await sendTemporaryMessage(chatId, "🤖 Thinking...")
+        
+        // Get response from Gemini
+        const aiResponse = await getGeminiResponse(chatId, text, update)
+        
+        // Delete the "Thinking..." message
+        if (thinkingMessage && thinkingMessage.ok) {
+          await deleteMessage(chatId, thinkingMessage.result.message_id)
+        }
+        
+        // Send the response back to the user
+        await sendMessage(chatId, aiResponse)
+      } finally {
+        // Remove reaction from user message
+        await removeMessageReaction(chatId, userMessageId, '✍️')
       }
-      
-      // Send the response back to the user
-      await sendMessage(chatId, aiResponse)
     }
   } catch (error) {
     console.error('Error processing update:', error)
@@ -156,6 +184,13 @@ async function getGeminiResponse(chatId, message, update) {
     const apiKey = GEMINI_API_KEY
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY environment variable is not set')
+    }
+    
+    // Check if conversation should be reset
+    const shouldReset = await checkResetFlag(chatId)
+    if (shouldReset) {
+      // Clear the reset flag
+      await clearResetFlag(chatId)
     }
     
     // System instruction for HTML formatting
@@ -195,8 +230,8 @@ IMPORTANT: Always escape HTML special characters in your response that are not p
       }
     ];
     
-    // If this is a reply, add context from the replied message
-    if (update.message.reply_to_message) {
+    // If this is a reply and conversation is not reset, add context from the replied message
+    if (!shouldReset && update.message.reply_to_message) {
       const repliedText = update.message.reply_to_message.text || '';
       const repliedFrom = update.message.reply_to_message.from.is_bot ? 'AI' : 'User';
       
@@ -351,6 +386,71 @@ function processHtmlResponse(text) {
   return processed;
 }
 
+// Conversation reset functions
+async function resetConversation(chatId) {
+  try {
+    const key = `reset:${chatId}`
+    await BOT_CACHE.put(key, 'true', { expirationTtl: 300 }) // 5 minutes
+  } catch (error) {
+    console.error('Error setting reset flag:', error)
+  }
+}
+
+async function checkResetFlag(chatId) {
+  try {
+    const key = `reset:${chatId}`
+    const value = await BOT_CACHE.get(key)
+    return value === 'true'
+  } catch (error) {
+    console.error('Error checking reset flag:', error)
+    return false
+  }
+}
+
+async function clearResetFlag(chatId) {
+  try {
+    const key = `reset:${chatId}`
+    await BOT_CACHE.delete(key)
+  } catch (error) {
+    console.error('Error clearing reset flag:', error)
+  }
+}
+
+// Message reaction functions
+async function addMessageReaction(chatId, messageId, emoji) {
+  try {
+    const token = TELEGRAM_BOT_TOKEN
+    await fetch(`https://api.telegram.org/bot${token}/setMessageReaction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        reaction: [{ type: 'emoji', emoji: emoji }]
+      })
+    })
+  } catch (error) {
+    console.error('Error adding message reaction:', error)
+  }
+}
+
+async function removeMessageReaction(chatId, messageId, emoji) {
+  try {
+    const token = TELEGRAM_BOT_TOKEN
+    await fetch(`https://api.telegram.org/bot${token}/setMessageReaction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        reaction: [] // Empty array removes all reactions
+      })
+    })
+  } catch (error) {
+    console.error('Error removing message reaction:', error)
+  }
+}
+
 async function sendMessage(chatId, text) {
   try {
     console.log(`Sending message to ${chatId}: ${text.substring(0, 100)}...`)
@@ -485,4 +585,4 @@ function fetchWithTimeout(url, options, timeout = 10000) {
       setTimeout(() => reject(new Error('Request timeout')), timeout)
     )
   ])
-}
+        }
