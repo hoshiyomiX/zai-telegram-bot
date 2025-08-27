@@ -1,3 +1,143 @@
+addEventListener('fetch', event => {
+  event.respondWith(handleRequest(event))
+})
+
+async function handleRequest(event) {
+  const request = event.request
+  
+  // Handle GET requests (for webhook verification)
+  if (request.method === 'GET') {
+    return new Response('Gemini Telegram Bot is running!')
+  }
+  
+  // Handle POST requests (for Telegram updates)
+  if (request.method === 'POST') {
+    try {
+      // Clone the request to read the body
+      const requestClone = request.clone()
+      
+      // Read the request body before sending response
+      const update = await requestClone.json()
+      
+      // Immediately respond to Telegram to avoid timeout
+      const response = new Response('OK')
+      
+      // Process the update in the background
+      event.waitUntil(handleUpdate(update))
+      
+      return response
+    } catch (error) {
+      console.error('Error handling request:', error)
+      return new Response('Error', { status: 500 })
+    }
+  }
+  
+  return new Response('Method not allowed', { status: 405 })
+}
+
+async function handleUpdate(update) {
+  try {
+    // Check if the update contains a message
+    if (!update.message) {
+      console.log('No message in update')
+      return
+    }
+    
+    const chatId = update.message.chat.id
+    const text = update.message.text || ''
+    const chatType = update.message.chat.type
+    const isGroup = chatType === 'group' || chatType === 'supergroup'
+    
+    console.log(`Message from ${chatId}: ${text}`)
+    
+    // Extract bot ID from token
+    const BOT_ID = TELEGRAM_BOT_TOKEN.split(':')[0]
+    
+    // Assume BOT_USERNAME is set as an environment variable or hardcode it here
+    // For example: const BOT_USERNAME = 'YourBotUsername' // without @
+    const BOT_USERNAME = TELEGRAM_BOT_USERNAME // Assuming it's defined in environment variables
+    
+    // Determine if should respond in groups
+    let shouldRespond = !isGroup // Always respond in private chats
+    
+    if (isGroup) {
+      // Check if mentioned/tagged
+      if (text.toLowerCase().includes(`@${BOT_USERNAME.toLowerCase()}`)) {
+        shouldRespond = true
+      }
+      // Check if replied to bot's message
+      if (update.message.reply_to_message && update.message.reply_to_message.from.id === BOT_ID) {
+        shouldRespond = true
+      }
+    }
+    
+    // Handle commands regardless, but check if directed to bot in groups
+    if (text.startsWith('/')) {
+      let commandText = text.split(' ')[0].toLowerCase()
+      if (isGroup && commandText.includes('@')) {
+        const commandUsername = commandText.split('@')[1].toLowerCase()
+        if (commandUsername !== BOT_USERNAME.toLowerCase()) {
+          return // Command not for this bot
+        }
+        commandText = commandText.split('@')[0] // Remove @part
+      }
+      
+      if (commandText === '/start') {
+        await sendMessage(chatId, 
+          `🤖 <b>Gemini 2.5 Flash Chat Bot</b>\n\n` +
+          `Hello! I'm powered by Google's Gemini 2.5 Flash model. Send me any message and I'll respond as an AI assistant.\n\n` +
+          `Commands:\n` +
+          `/start - Welcome message\n` +
+          `/help - Show this help message\n\n` +
+          `Just send me any text message and I'll respond as an AI assistant.`
+        )
+        return
+      }
+      
+      if (commandText === '/help') {
+        await sendMessage(chatId, 
+          `📖 <b>Help</b>\n\n` +
+          `Available commands:\n` +
+          `/start - Welcome message\n` +
+          `/help - Show this help message\n\n` +
+          `Just send me any text message and I'll respond as an AI assistant.`
+        )
+        return
+      }
+    }
+    
+    // For non-command messages, check if should respond
+    if (!shouldRespond) {
+      console.log('Ignoring message in group: not tagged or replied to bot')
+      return
+    }
+    
+    // If the message is not empty, send it to Gemini
+    if (text.trim() !== '') {
+      // Send a "Thinking..." message to show the bot is processing
+      const thinkingMessage = await sendTemporaryMessage(chatId, "🤖 Thinking...")
+      
+      // Get response from Gemini
+      const aiResponse = await getGeminiResponse(chatId, text, update)
+      
+      // Delete the "Thinking..." message
+      if (thinkingMessage && thinkingMessage.ok) {
+        await deleteMessage(chatId, thinkingMessage.result.message_id)
+      }
+      
+      // Send the response back to the user
+      await sendMessage(chatId, aiResponse)
+    }
+  } catch (error) {
+    console.error('Error processing update:', error)
+    // Send error message to user
+    const chatId = update.message?.chat.id
+    if (chatId) {
+      await sendMessage(chatId, "Sorry, I'm having trouble responding right now. Please try again later.")
+    }
+  }
+}
+
 async function getGeminiResponse(chatId, message, update) {
   try {
     console.log('Sending message to Gemini 2.5 Flash...')
@@ -139,4 +279,138 @@ async function getGeminiResponse(chatId, message, update) {
     
     return `Sorry, I encountered an error while processing your request: ${error.message}`
   }
+}
+
+async function sendMessage(chatId, text) {
+  try {
+    console.log(`Sending message to ${chatId}: ${text.substring(0, 100)}...`)
+    const token = TELEGRAM_BOT_TOKEN
+    
+    // Split long messages into chunks to avoid Telegram API limits
+    const maxMessageLength = 4096; // Telegram's max message length
+    if (text.length > maxMessageLength) {
+      const chunks = splitMessage(text, maxMessageLength);
+      for (const chunk of chunks) {
+        await sendSingleMessage(chatId, chunk);
+      }
+    } else {
+      await sendSingleMessage(chatId, text);
+    }
+  } catch (error) {
+    console.error('Error in sendMessage:', error)
+  }
+}
+
+async function sendSingleMessage(chatId, text) {
+  const token = TELEGRAM_BOT_TOKEN
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true
+    })
+  })
+  
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('Error sending message:', errorText)
+  } else {
+    console.log('Message sent successfully')
+  }
+}
+
+async function sendTemporaryMessage(chatId, text) {
+  try {
+    const token = TELEGRAM_BOT_TOKEN
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: text,
+        parse_mode: 'HTML'
+      })
+    })
+    
+    if (!response.ok) {
+      console.error('Error sending temporary message:', await response.text())
+      return null
+    }
+    
+    return await response.json()
+  } catch (error) {
+    console.error('Error in sendTemporaryMessage:', error)
+    return null
+  }
+}
+
+async function deleteMessage(chatId, messageId) {
+  try {
+    const token = TELEGRAM_BOT_TOKEN
+    const response = await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId
+      })
+    })
+    
+    if (!response.ok) {
+      console.error('Error deleting message:', await response.text())
+    }
+  } catch (error) {
+    console.error('Error in deleteMessage:', error)
+  }
+}
+
+function splitMessage(text, maxLength) {
+  const chunks = [];
+  while (text.length > 0) {
+    // Find the last space before maxLength to avoid breaking words
+    let splitIndex = text.lastIndexOf(' ', maxLength);
+    if (splitIndex === -1) splitIndex = maxLength; // No space found, split at maxLength
+    
+    chunks.push(text.substring(0, splitIndex));
+    text = text.substring(splitIndex).trim();
+  }
+  return chunks;
+}
+
+async function sendChatAction(chatId, action) {
+  try {
+    const token = TELEGRAM_BOT_TOKEN
+    await fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        action: action
+      })
+    })
+  } catch (error) {
+    console.error('Error sending chat action:', error)
+  }
+}
+
+function escapeHtml(text) {
+  if (!text) return ''
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+// Helper function for fetch with timeout
+function fetchWithTimeout(url, options, timeout = 10000) {
+  console.log(`Fetching ${url} with timeout ${timeout}ms`)
+  return Promise.race([
+    fetch(url, options),
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Request timeout')), timeout)
+    )
+  ])
 }
