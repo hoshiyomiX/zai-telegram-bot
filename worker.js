@@ -211,12 +211,17 @@ async function getGeminiResponse(chatId, message, update) {
   <pre><code class="language-xml"> for XML
   <pre><code class="language-yaml"> for YAML
   <pre><code class="language-markdown"> for Markdown
+- Use <ul> and <li> for bullet point lists
+- Use <ol> and <li> for numbered lists
 
 IMPORTANT: Always escape HTML special characters in your response that are not part of formatting tags. For example:
 - Use &lt; for < character
 - Use &gt; for > character
 - Use &amp; for & character
-- Only use the allowed HTML tags mentioned above for formatting.`;
+- Only use the allowed HTML tags mentioned above for formatting.
+
+When showing code examples, always use proper code blocks with the appropriate language class. For example:
+<pre><code class="language-shell">0 6 * * * /home/user/script.sh >> /dev/null 2>&1</code></pre>`;
     
     // Prepare the contents array with system instruction and user message
     let contents = [
@@ -373,6 +378,12 @@ function processHtmlResponse(text) {
     ['</code>', '&lt;/code&gt;'],
     ['<pre>', '&lt;pre&gt;'],
     ['</pre>', '&lt;/pre&gt;'],
+    ['<ul>', '&lt;ul&gt;'],
+    ['</ul>', '&lt;/ul&gt;'],
+    ['<ol>', '&lt;ol&gt;'],
+    ['</ol>', '&lt;/ol&gt;'],
+    ['<li>', '&lt;li&gt;'],
+    ['</li>', '&lt;/li&gt;'],
   ];
   
   // Replace each allowed tag
@@ -382,6 +393,30 @@ function processHtmlResponse(text) {
   
   // Handle <code> with class attribute
   processed = processed.replace(/&lt;code class="language-([^"]+)"&gt;/g, '<code class="language-$1">');
+  
+  // Fix code blocks - unescape HTML entities inside <code> and <pre> tags
+  processed = processed.replace(/<(code|pre)(?:\s+[^>]*)?>(.*?)<\/\1>/gs, (match, tag, content) => {
+    // Unescape the content inside code blocks
+    let unescapedContent = content
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#039;/g, "'");
+    
+    return `<${tag}>${unescapedContent}</${tag}>`;
+  });
+  
+  // Fix bullet points - convert asterisks to HTML lists
+  // This handles simple bullet points at the beginning of lines
+  processed = processed.replace(/^(\s*)\*\s+(.+)$/gm, (match, spaces, content) => {
+    return `${spaces}<li>${content}</li>`;
+  });
+  
+  // Wrap consecutive <li> elements with <ul>
+  processed = processed.replace(/(<li>.*<\/li>\s*)+/gs, (match) => {
+    return `<ul>${match}</ul>`;
+  });
   
   return processed;
 }
@@ -552,37 +587,4 @@ function splitMessage(text, maxLength) {
 
 async function sendChatAction(chatId, action) {
   try {
-    const token = TELEGRAM_BOT_TOKEN
-    await fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        action: action
-      })
-    })
-  } catch (error) {
-    console.error('Error sending chat action:', error)
-  }
-}
-
-function escapeHtml(text) {
-  if (!text) return ''
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-}
-
-// Helper function for fetch with timeout
-function fetchWithTimeout(url, options, timeout = 10000) {
-  console.log(`Fetching ${url} with timeout ${timeout}ms`)
-  return Promise.race([
-    fetch(url, options),
-    new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Request timeout')), timeout)
-    )
-  ])
-        }
+    con
