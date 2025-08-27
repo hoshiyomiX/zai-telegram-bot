@@ -91,11 +91,9 @@ async function handleUpdate(update) {
           `/help - Show this help message\n\n` +
           `Formatting support:\n` +
           `<b>Bold text</b>, <i>italic text</i>, <u>underline</u>, <s>strikethrough</s>\n` +
-          `Code blocks: <code>inline code</code>\n` +
+          `Inline code: <code>console.log()</code>\n` +
           `Multi-line code:\n` +
-          `<pre><code class="language-python">Python code</code></pre>\n` +
-          `<pre><code class="language-javascript">JavaScript code</code></pre>\n` +
-          `<pre><code class="language-shell">Shell commands</code></pre>\n\n` +
+          `<pre><code class="language-python">def hello():\n    print("Hello World")</code></pre>\n\n` +
           `Just send me any text message and I'll respond as an AI assistant.`
         )
         return
@@ -109,11 +107,9 @@ async function handleUpdate(update) {
           `/help - Show this help message\n\n` +
           `Formatting support:\n` +
           `<b>Bold text</b>, <i>italic text</i>, <u>underline</u>, <s>strikethrough</s>\n` +
-          `Code blocks: <code>inline code</code>\n` +
+          `Inline code: <code>console.log()</code>\n` +
           `Multi-line code:\n` +
-          `<pre><code class="language-python">Python code</code></pre>\n` +
-          `<pre><code class="language-javascript">JavaScript code</code></pre>\n` +
-          `<pre><code class="language-shell">Shell commands</code></pre>\n\n` +
+          `<pre><code class="language-python">def hello():\n    print("Hello World")</code></pre>\n\n` +
           `Just send me any text message and I'll respond as an AI assistant.`
         )
         return
@@ -180,7 +176,12 @@ async function getGeminiResponse(chatId, message, update) {
   <pre><code class="language-xml"> for XML
   <pre><code class="language-yaml"> for YAML
   <pre><code class="language-markdown"> for Markdown
-Always escape HTML special characters in your response that are not part of formatting tags.`;
+
+IMPORTANT: Always escape HTML special characters in your response that are not part of formatting tags. For example:
+- Use &lt; for < character
+- Use &gt; for > character
+- Use &amp; for & character
+- Only use the allowed HTML tags mentioned above for formatting.`;
     
     // Prepare the contents array with system instruction and user message
     let contents = [
@@ -282,6 +283,9 @@ Always escape HTML special characters in your response that are not part of form
           responseText += "\n\n⚠️ [Note: Response reached maximum length. The answer may be incomplete. Please ask for more specific details if needed.]"
         }
         
+        // Process the response to ensure proper HTML formatting
+        responseText = processHtmlResponse(responseText)
+        
         return responseText
       }
       
@@ -313,6 +317,38 @@ Always escape HTML special characters in your response that are not part of form
     
     return `Sorry, I encountered an error while processing your request: ${error.message}`
   }
+}
+
+// Process HTML response to ensure proper formatting
+function processHtmlResponse(text) {
+  // First, escape all HTML special characters
+  let processed = escapeHtml(text);
+  
+  // Then unescape only the allowed tags
+  const allowedTags = [
+    ['<b>', '&lt;b&gt;'],
+    ['</b>', '&lt;/b&gt;'],
+    ['<i>', '&lt;i&gt;'],
+    ['</i>', '&lt;/i&gt;'],
+    ['<u>', '&lt;u&gt;'],
+    ['</u>', '&lt;/u&gt;'],
+    ['<s>', '&lt;s&gt;'],
+    ['</s>', '&lt;/s&gt;'],
+    ['<code>', '&lt;code&gt;'],
+    ['</code>', '&lt;/code&gt;'],
+    ['<pre>', '&lt;pre&gt;'],
+    ['</pre>', '&lt;/pre&gt;'],
+  ];
+  
+  // Replace each allowed tag
+  for (const [tag, escapedTag] of allowedTags) {
+    processed = processed.replace(new RegExp(escapedTag, 'g'), tag);
+  }
+  
+  // Handle <code> with class attribute
+  processed = processed.replace(/&lt;code class="language-([^"]+)"&gt;/g, '<code class="language-$1">');
+  
+  return processed;
 }
 
 async function sendMessage(chatId, text) {
@@ -436,6 +472,8 @@ function escapeHtml(text) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
 }
 
 // Helper function for fetch with timeout
