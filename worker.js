@@ -94,7 +94,7 @@ async function handleUpdate(update) {
           `💡 <b>Features:</b>\n` +
           `• Natural language conversations\n` +
           `• Code generation in multiple languages\n` +
-          `• Text formatting (bold, italic, etc.)\n` +
+          `• Text formatting in my responses\n` +
           `• Context-aware responses\n\n` +
           `Just send me any message and I'll respond as an AI assistant!`
         )
@@ -113,12 +113,11 @@ async function handleUpdate(update) {
           `💡 <b>Features:</b>\n` +
           `• Natural language conversations\n` +
           `• Code generation in multiple languages\n` +
-          `• Text formatting (bold, italic, etc.)\n` +
+          `• Text formatting in my responses\n` +
           `• Context-aware responses\n\n` +
-          `💬 <b>Formatting Support:</b>\n` +
-          `<b>Bold text</b>, <i>italic text</i>, <u>underline</u>, <s>strikethrough</s>\n` +
-          `Inline code: <code>console.log()</code>\n` +
-          `Multi-line code:\n` +
+          `💬 <b>Formatting in My Responses:</b>\n` +
+          `I'll format my answers with <b>bold</b>, <i>italic</i>, <u>underline</u>, and <s>strikethrough</s> text.\n` +
+          `Code will be formatted as <code>inline code</code> or in multi-line blocks:\n` +
           `<pre><code class="language-python">def hello():\n    print("Hello World")</code></pre>\n\n` +
           `Just send me any message and I'll respond as an AI assistant!`
         )
@@ -193,14 +192,15 @@ async function getGeminiResponse(chatId, message, update) {
       await clearResetFlag(chatId)
     }
     
-    // System instruction for HTML formatting
-    const systemInstruction = `You are a helpful assistant. Format your response using HTML tags:
+    // System instruction for HTML formatting in bot responses
+    const systemInstruction = `You are a helpful assistant. Format your responses using HTML tags that Telegram supports:
 - Use <b> for bold text
 - Use <i> for italic text
 - Use <u> for underline
 - Use <s> for strikethrough
-- Use <code> for inline code
-- For multi-line code blocks, use:
+- Use <code> for inline fixed-width code
+- Use <pre> for pre-formatted fixed-width code block
+- For multi-line code blocks with syntax highlighting, use:
   <pre><code class="language-python"> for Python
   <pre><code class="language-javascript"> for JavaScript
   <pre><code class="language-shell"> for shell commands
@@ -211,17 +211,15 @@ async function getGeminiResponse(chatId, message, update) {
   <pre><code class="language-xml"> for XML
   <pre><code class="language-yaml"> for YAML
   <pre><code class="language-markdown"> for Markdown
-- Use <ul> and <li> for bullet point lists
-- Use <ol> and <li> for numbered lists
 
-IMPORTANT: Always escape HTML special characters in your response that are not part of formatting tags. For example:
-- Use &lt; for < character
-- Use &gt; for > character
-- Use &amp; for & character
-- Only use the allowed HTML tags mentioned above for formatting.
-
-When showing code examples, always use proper code blocks with the appropriate language class. For example:
-<pre><code class="language-shell">0 6 * * * /home/user/script.sh >> /dev/null 2>&1</code></pre>`;
+IMPORTANT: 
+1. Always escape HTML special characters in your responses that are not part of formatting tags. For example:
+   - Use &lt; for < character
+   - Use &gt; for > character
+   - Use &amp; for & character
+   - Only use the allowed HTML tags mentioned above for formatting.
+2. Treat user input as plain text, not HTML. Do not interpret any HTML tags in user messages.
+3. Format only your own responses, not the user's input.`;
     
     // Prepare the contents array with system instruction and user message
     let contents = [
@@ -323,7 +321,7 @@ When showing code examples, always use proper code blocks with the appropriate l
           responseText += "\n\n⚠️ [Note: Response reached maximum length. The answer may be incomplete. Please ask for more specific details if needed.]"
         }
         
-        // Process the response to ensure proper HTML formatting
+        // Process the response to ensure proper HTML formatting for Telegram
         responseText = processHtmlResponse(responseText)
         
         return responseText
@@ -359,31 +357,31 @@ When showing code examples, always use proper code blocks with the appropriate l
   }
 }
 
-// Process HTML response to ensure proper formatting
+// Process HTML response to ensure proper formatting for Telegram
 function processHtmlResponse(text) {
   // First, escape all HTML special characters
   let processed = escapeHtml(text);
   
-  // Then unescape only the allowed tags
+  // Then unescape only the allowed tags that Telegram supports
   const allowedTags = [
+    // Bold
     ['<b>', '&lt;b&gt;'],
     ['</b>', '&lt;/b&gt;'],
+    // Italic
     ['<i>', '&lt;i&gt;'],
     ['</i>', '&lt;/i&gt;'],
+    // Underline
     ['<u>', '&lt;u&gt;'],
     ['</u>', '&lt;/u&gt;'],
+    // Strikethrough
     ['<s>', '&lt;s&gt;'],
     ['</s>', '&lt;/s&gt;'],
+    // Code
     ['<code>', '&lt;code&gt;'],
     ['</code>', '&lt;/code&gt;'],
+    // Pre
     ['<pre>', '&lt;pre&gt;'],
     ['</pre>', '&lt;/pre&gt;'],
-    ['<ul>', '&lt;ul&gt;'],
-    ['</ul>', '&lt;/ul&gt;'],
-    ['<ol>', '&lt;ol&gt;'],
-    ['</ol>', '&lt;/ol&gt;'],
-    ['<li>', '&lt;li&gt;'],
-    ['</li>', '&lt;/li&gt;'],
   ];
   
   // Replace each allowed tag
@@ -391,32 +389,12 @@ function processHtmlResponse(text) {
     processed = processed.replace(new RegExp(escapedTag, 'g'), tag);
   }
   
-  // Handle <code> with class attribute
-  processed = processed.replace(/&lt;code class="language-([^"]+)"&gt;/g, '<code class="language-$1">');
-  
-  // Fix code blocks - unescape HTML entities inside <code> and <pre> tags
-  processed = processed.replace(/<(code|pre)(?:\s+[^>]*)?>(.*?)<\/\1>/gs, (match, tag, content) => {
-    // Unescape the content inside code blocks
-    let unescapedContent = content
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&amp;/g, '&')
-      .replace(/&quot;/g, '"')
-      .replace(/&#039;/g, "'");
-    
-    return `<${tag}>${unescapedContent}</${tag}>`;
-  });
-  
-  // Fix bullet points - convert asterisks to HTML lists
-  // This handles simple bullet points at the beginning of lines
-  processed = processed.replace(/^(\s*)\*\s+(.+)$/gm, (match, spaces, content) => {
-    return `${spaces}<li>${content}</li>`;
-  });
-  
-  // Wrap consecutive <li> elements with <ul>
-  processed = processed.replace(/(<li>.*<\/li>\s*)+/gs, (match) => {
-    return `<ul>${match}</ul>`;
-  });
+  // Handle <pre><code class="language-..."> pattern
+  // The pattern in escaped form: &lt;pre&gt;&lt;code class=&quot;language-([^&]+)&quot;&gt;
+  processed = processed.replace(
+    /&lt;pre&gt;&lt;code class=&quot;language-([^&]+)&quot;&gt;/g,
+    '<pre><code class="language-$1">'
+  );
   
   return processed;
 }
@@ -587,4 +565,37 @@ function splitMessage(text, maxLength) {
 
 async function sendChatAction(chatId, action) {
   try {
-    con
+    const token = TELEGRAM_BOT_TOKEN
+    await fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        action: action
+      })
+    })
+  } catch (error) {
+    console.error('Error sending chat action:', error)
+  }
+}
+
+function escapeHtml(text) {
+  if (!text) return ''
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+// Helper function for fetch with timeout
+function fetchWithTimeout(url, options, timeout = 10000) {
+  console.log(`Fetching ${url} with timeout ${timeout}ms`)
+  return Promise.race([
+    fetch(url, options),
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Request timeout')), timeout)
+    )
+  ])
+}
