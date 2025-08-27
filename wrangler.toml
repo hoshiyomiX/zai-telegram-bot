@@ -8,7 +8,7 @@ kv_namespaces = [
 
 [vars]
 TELEGRAM_BOT_TOKEN = "8285384768:AAFiWdICSWyAH3w6CqHtb8akZSn0RZj_vRM"
-GEMINI_API_KEY = "AIzaSyC5YVDw_N03g6TD6N4gdZm9WqKOmDuAuOk"
+GEMINI_API_KEY = "AIzaSyAOTo2TSBOppV7ez8NlXKJWrJSOkeizkss"
 TELEGRAM_BOT_USERNAME = "Chat_zAI_bot" 
 
 [observability.logs]
