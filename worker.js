@@ -89,6 +89,13 @@ async function handleUpdate(update) {
           `Commands:\n` +
           `/start - Welcome message\n` +
           `/help - Show this help message\n\n` +
+          `Formatting support:\n` +
+          `<b>Bold text</b>, <i>italic text</i>, <u>underline</u>, <s>strikethrough</s>\n` +
+          `Code blocks: <code>inline code</code>\n` +
+          `Multi-line code:\n` +
+          `<pre><code class="language-python">Python code</code></pre>\n` +
+          `<pre><code class="language-javascript">JavaScript code</code></pre>\n` +
+          `<pre><code class="language-shell">Shell commands</code></pre>\n\n` +
           `Just send me any text message and I'll respond as an AI assistant.`
         )
         return
@@ -100,6 +107,13 @@ async function handleUpdate(update) {
           `Available commands:\n` +
           `/start - Welcome message\n` +
           `/help - Show this help message\n\n` +
+          `Formatting support:\n` +
+          `<b>Bold text</b>, <i>italic text</i>, <u>underline</u>, <s>strikethrough</s>\n` +
+          `Code blocks: <code>inline code</code>\n` +
+          `Multi-line code:\n` +
+          `<pre><code class="language-python">Python code</code></pre>\n` +
+          `<pre><code class="language-javascript">JavaScript code</code></pre>\n` +
+          `<pre><code class="language-shell">Shell commands</code></pre>\n\n` +
           `Just send me any text message and I'll respond as an AI assistant.`
         )
         return
@@ -148,31 +162,51 @@ async function getGeminiResponse(chatId, message, update) {
       throw new Error('GEMINI_API_KEY environment variable is not set')
     }
     
-    // Prepare the contents array - no truncation of input
+    // System instruction for HTML formatting
+    const systemInstruction = `You are a helpful assistant. Format your response using HTML tags:
+- Use <b> for bold text
+- Use <i> for italic text
+- Use <u> for underline
+- Use <s> for strikethrough
+- Use <code> for inline code
+- For multi-line code blocks, use:
+  <pre><code class="language-python"> for Python
+  <pre><code class="language-javascript"> for JavaScript
+  <pre><code class="language-shell"> for shell commands
+  <pre><code class="language-html"> for HTML
+  <pre><code class="language-css"> for CSS
+  <pre><code class="language-sql"> for SQL
+  <pre><code class="language-json"> for JSON
+  <pre><code class="language-xml"> for XML
+  <pre><code class="language-yaml"> for YAML
+  <pre><code class="language-markdown"> for Markdown
+Always escape HTML special characters in your response that are not part of formatting tags.`;
+    
+    // Prepare the contents array with system instruction and user message
     let contents = [
       {
-        parts: [
-          {
-            text: message // Use full message without truncation
-          }
-        ]
+        role: "user",
+        parts: [{ text: systemInstruction }]
+      },
+      {
+        role: "user",
+        parts: [{ text: message }]
       }
     ];
     
     // If this is a reply, add context from the replied message
     if (update.message.reply_to_message) {
       const repliedText = update.message.reply_to_message.text || '';
-      const repliedFrom = update.message.reply_to_message.from.is_bot ? 'AI:' : 'User:';
-      const contextText = `Context from previous message:\n${repliedFrom} ${repliedText}\n\nUser: ${message}`;
+      const repliedFrom = update.message.reply_to_message.from.is_bot ? 'AI' : 'User';
       
+      // Insert the context between system instruction and current message
       contents = [
+        contents[0], // System instruction
         {
-          parts: [
-            {
-              text: contextText
-            }
-          ]
-        }
+          role: repliedFrom === 'User' ? "user" : "model",
+          parts: [{ text: repliedText }]
+        },
+        contents[1] // Current user message
       ];
     }
     
