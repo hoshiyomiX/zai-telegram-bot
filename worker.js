@@ -47,7 +47,6 @@ async function handleUpdate(update) {
     const text = update.message.text || ''
     const chatType = update.message.chat.type
     const isGroup = chatType === 'group' || chatType === 'supergroup'
-    const userMessageId = update.message.message_id
     
     console.log(`Message from ${chatId}: ${text}`)
     
@@ -90,11 +89,6 @@ async function handleUpdate(update) {
           `Commands:\n` +
           `/start - Welcome message\n` +
           `/help - Show this help message\n\n` +
-          `Formatting support:\n` +
-          `<b>Bold text</b>, <i>italic text</i>, <u>underline</u>, <s>strikethrough</s>\n` +
-          `Inline code: <code>console.log()</code>\n` +
-          `Multi-line code:\n` +
-          `<pre><code class="language-python">def hello():\n    print("Hello World")</code></pre>\n\n` +
           `Just send me any text message and I'll respond as an AI assistant.`
         )
         return
@@ -106,11 +100,6 @@ async function handleUpdate(update) {
           `Available commands:\n` +
           `/start - Welcome message\n` +
           `/help - Show this help message\n\n` +
-          `Formatting support:\n` +
-          `<b>Bold text</b>, <i>italic text</i>, <u>underline</u>, <s>strikethrough</s>\n` +
-          `Inline code: <code>console.log()</code>\n` +
-          `Multi-line code:\n` +
-          `<pre><code class="language-python">def hello():\n    print("Hello World")</code></pre>\n\n` +
           `Just send me any text message and I'll respond as an AI assistant.`
         )
         return
@@ -125,27 +114,22 @@ async function handleUpdate(update) {
     
     // If the message is not empty, send it to Gemini
     if (text.trim() !== '') {
-      // Add reaction to user message
-      await addMessageReaction(chatId, userMessageId, '✍️')
+      // Send a "Thinking..." message to show the bot is processing
+      const thinkingMessage = await sendTemporaryMessage(chatId, "🤖 Thinking...")
       
-      try {
-        // Send a "Thinking..." message to show the bot is processing
-        const thinkingMessage = await sendTemporaryMessage(chatId, "🤖 Thinking...")
-        
-        // Get response from Gemini
-        const aiResponse = await getGeminiResponse(chatId, text, update)
-        
-        // Delete the "Thinking..." message
-        if (thinkingMessage && thinkingMessage.ok) {
-          await deleteMessage(chatId, thinkingMessage.result.message_id)
-        }
-        
-        // Send the response back to the user
-        await sendMessage(chatId, aiResponse)
-      } finally {
-        // Remove reaction from user message
-        await removeMessageReaction(chatId, userMessageId, '✍️')
+      // Get response from Gemini
+      const aiResponse = await getGeminiResponse(chatId, text, update)
+      
+      // Delete the "Thinking..." message
+      if (thinkingMessage && thinkingMessage.ok) {
+        await deleteMessage(chatId, thinkingMessage.result.message_id)
       }
+      
+      // Format the response for Telegram
+      const formattedResponse = formatForTelegram(aiResponse)
+      
+      // Send the response back to the user
+      await sendMessage(chatId, formattedResponse)
     }
   } catch (error) {
     console.error('Error processing update:', error)
@@ -167,51 +151,31 @@ async function getGeminiResponse(chatId, message, update) {
       throw new Error('GEMINI_API_KEY environment variable is not set')
     }
     
-    // System instruction for HTML formatting
-    const systemInstruction = `You are a helpful assistant. Format your response using HTML tags that Telegram supports:
-- Use <b> for bold text
-- Use <i> for italic text
-- Use <u> for underline
-- Use <s> for strikethrough
-- Use <code> for inline fixed-width code
-- For multi-line code blocks, ALWAYS use the format: <pre><code class="language-xxx">...your code here...</code></pre> where xxx is the programming language (e.g., python, javascript, etc.)
-
-IMPORTANT: 
-1. Always escape HTML special characters in your responses that are not part of formatting tags. For example:
-   - Use &lt; for < character
-   - Use &gt; for > character
-   - Use &amp; for & character
-   - Only use the allowed HTML tags mentioned above for formatting.
-2. Treat user input as plain text, not HTML. Do not interpret any HTML tags in user messages.
-3. Format only your own responses, not the user's input.
-4. For code blocks, always use the exact format: <pre><code class="language-xxx">...</code></pre> and never use <pre> without <code> inside or vice versa.
-5. Always properly close all HTML tags.`;
-    
-    // Prepare the contents array with system instruction and user message
+    // Prepare the contents array - no truncation of input
     let contents = [
       {
-        role: "user",
-        parts: [{ text: systemInstruction }]
-      },
-      {
-        role: "user",
-        parts: [{ text: message }]
+        parts: [
+          {
+            text: message // Use full message without truncation
+          }
+        ]
       }
     ];
     
     // If this is a reply, add context from the replied message
     if (update.message.reply_to_message) {
       const repliedText = update.message.reply_to_message.text || '';
-      const repliedFrom = update.message.reply_to_message.from.is_bot ? 'AI' : 'User';
+      const repliedFrom = update.message.reply_to_message.from.is_bot ? 'AI:' : 'User:';
+      const contextText = `Context from previous message:\n${repliedFrom} ${repliedText}\n\nUser: ${message}`;
       
-      // Insert the context between system instruction and current message
       contents = [
-        contents[0], // System instruction
         {
-          role: repliedFrom === 'User' ? "user" : "model",
-          parts: [{ text: repliedText }]
-        },
-        contents[1] // Current user message
+          parts: [
+            {
+              text: contextText
+            }
+          ]
+        }
       ];
     }
     
@@ -287,9 +251,6 @@ IMPORTANT:
           responseText += "\n\n⚠️ [Note: Response reached maximum length. The answer may be incomplete. Please ask for more specific details if needed.]"
         }
         
-        // Process the response to ensure proper HTML formatting
-        responseText = processHtmlResponse(responseText)
-        
         return responseText
       }
       
@@ -323,89 +284,6 @@ IMPORTANT:
   }
 }
 
-// Process HTML response to ensure proper formatting for Telegram
-function processHtmlResponse(text) {
-  // First, escape all HTML special characters
-  let processed = escapeHtml(text);
-  
-  // Then unescape only the allowed tags
-  const allowedTags = [
-    ['<b>', '&lt;b&gt;'],
-    ['</b>', '&lt;/b&gt;'],
-    ['<i>', '&lt;i&gt;'],
-    ['</i>', '&lt;/i&gt;'],
-    ['<u>', '&lt;u&gt;'],
-    ['</u>', '&lt;/u&gt;'],
-    ['<s>', '&lt;s&gt;'],
-    ['</s>', '&lt;/s&gt;'],
-    ['<code>', '&lt;code&gt;'],
-    ['</code>', '&lt;/code&gt;'],
-    ['<pre>', '&lt;pre&gt;'],
-    ['</pre>', '&lt;/pre&gt;'],
-  ];
-  
-  // Replace each allowed tag
-  for (const [tag, escapedTag] of allowedTags) {
-    processed = processed.replace(new RegExp(escapedTag, 'g'), tag);
-  }
-  
-  // Handle <code> with class attribute for language specification
-  processed = processed.replace(/&lt;code class="language-([^"]+)"&gt;/g, '<code class="language-$1">');
-  
-  // Fix HTML tag mismatches
-  processed = fixHtmlTags(processed);
-  
-  return processed;
-}
-
-// Fix HTML tag mismatches and ensure proper nesting
-function fixHtmlTags(html) {
-  let fixed = html;
-  
-  // 1. Fix <pre> tags that aren't followed by <code>
-  fixed = fixed.replace(/<pre>(?!<code>)/g, '<pre><code>');
-  
-  // 2. Fix </pre> tags that aren't preceded by </code>
-  fixed = fixed.replace(/(?<!<\/code>)<\/pre>/g, '</code></pre>');
-  
-  // 3. Fix <pre><code> without proper closing
-  fixed = fixed.replace(/<pre><code>(.*?)<\/pre>/g, '<pre><code>$1</code></pre>');
-  
-  // 4. Fix <code> tags that are closed with </code></pre> but not inside <pre>
-  fixed = fixed.replace(/<code>(.*?)<\/code><\/pre>/g, (match, content) => {
-    // Check if there's an opening <pre> before this
-    const preIndex = fixed.lastIndexOf('<pre>', fixed.indexOf(match));
-    if (preIndex === -1) {
-      return `<code>${content}</code>`;
-    }
-    return match;
-  });
-  
-  // 5. Fix unmatched <code> tags
-  const codeOpenCount = (fixed.match(/<code>(?!.*<\/pre>)/g) || []).length;
-  const codeCloseCount = (fixed.match(/<\/code>(?!.*<\/pre>)/g) || []).length;
-  
-  if (codeOpenCount > codeCloseCount) {
-    // Add missing closing tags
-    for (let i = 0; i < codeOpenCount - codeCloseCount; i++) {
-      fixed += '</code>';
-    }
-  }
-  
-  // 6. Fix unmatched <pre> tags
-  const preOpenCount = (fixed.match(/<pre>/g) || []).length;
-  const preCloseCount = (fixed.match(/<\/pre>/g) || []).length;
-  
-  if (preOpenCount > preCloseCount) {
-    // Add missing closing tags
-    for (let i = 0; i < preOpenCount - preCloseCount; i++) {
-      fixed += '</code></pre>';
-    }
-  }
-  
-  return fixed;
-}
-
 async function sendMessage(chatId, text) {
   try {
     console.log(`Sending message to ${chatId}: ${text.substring(0, 100)}...`)
@@ -428,55 +306,28 @@ async function sendMessage(chatId, text) {
 
 async function sendSingleMessage(chatId, text) {
   const token = TELEGRAM_BOT_TOKEN
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true
+    })
+  })
   
-  // Try sending with HTML formatting first
-  try {
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true
-      })
-    })
-    
-    if (response.ok) {
-      console.log('Message sent successfully with HTML')
-      return
-    }
-    
-    // If HTML fails, try without formatting
+  if (!response.ok) {
     const errorText = await response.text()
-    console.error('Error sending message with HTML:', errorText)
-    console.log('Trying without HTML formatting...')
-    
-    const plainResponse = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text,
-        disable_web_page_preview: true
-      })
-    })
-    
-    if (!plainResponse.ok) {
-      console.error('Error sending message without HTML:', await plainResponse.text())
-    } else {
-      console.log('Message sent successfully without HTML')
-    }
-  } catch (error) {
-    console.error('Error in sendSingleMessage:', error)
+    console.error('Error sending message:', errorText)
+  } else {
+    console.log('Message sent successfully')
   }
 }
 
 async function sendTemporaryMessage(chatId, text) {
   try {
     const token = TELEGRAM_BOT_TOKEN
-    
-    // Try sending with HTML formatting first
     const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -487,30 +338,12 @@ async function sendTemporaryMessage(chatId, text) {
       })
     })
     
-    if (response.ok) {
-      return await response.json()
-    }
-    
-    // If HTML fails, try without formatting
-    const errorText = await response.text()
-    console.error('Error sending temporary message with HTML:', errorText)
-    console.log('Trying without HTML formatting...')
-    
-    const plainResponse = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text
-      })
-    })
-    
-    if (!plainResponse.ok) {
-      console.error('Error sending temporary message without HTML:', await plainResponse.text())
+    if (!response.ok) {
+      console.error('Error sending temporary message:', await response.text())
       return null
     }
     
-    return await plainResponse.json()
+    return await response.json()
   } catch (error) {
     console.error('Error in sendTemporaryMessage:', error)
     return null
@@ -576,39 +409,74 @@ function escapeHtml(text) {
     .replace(/'/g, '&#039;')
 }
 
-// Message reaction functions
-async function addMessageReaction(chatId, messageId, emoji) {
-  try {
-    const token = TELEGRAM_BOT_TOKEN
-    await fetch(`https://api.telegram.org/bot${token}/setMessageReaction`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        message_id: messageId,
-        reaction: [{ type: 'emoji', emoji: emoji }]
-      })
+// Format AI response for Telegram HTML
+function formatForTelegram(text) {
+  if (!text) return ''
+  
+  // First, escape HTML special characters
+  let formattedText = escapeHtml(text)
+  
+  // Store code blocks to prevent them from being modified by other formatting
+  const codeBlocks = []
+  let codeIndex = 0
+  
+  // Process code blocks (```language code ```)
+  formattedText = formattedText.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, language, code) => {
+    const placeholder = `__CODE_BLOCK_${codeIndex}__`
+    codeBlocks.push({
+      type: 'block',
+      language: language || '',
+      code: code.trim()
     })
-  } catch (error) {
-    console.error('Error adding message reaction:', error)
-  }
-}
-
-async function removeMessageReaction(chatId, messageId, emoji) {
-  try {
-    const token = TELEGRAM_BOT_TOKEN
-    await fetch(`https://api.telegram.org/bot${token}/setMessageReaction`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        message_id: messageId,
-        reaction: [] // Empty array removes all reactions
-      })
+    codeIndex++
+    return placeholder
+  })
+  
+  // Process inline code (`code`)
+  formattedText = formattedText.replace(/`([^`]+)`/g, (match, code) => {
+    const placeholder = `__INLINE_CODE_${codeIndex}__`
+    codeBlocks.push({
+      type: 'inline',
+      code: code
     })
-  } catch (error) {
-    console.error('Error removing message reaction:', error)
-  }
+    codeIndex++
+    return placeholder
+  })
+  
+  // Process bold text (**bold**)
+  formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+  
+  // Process italic text (*italic*)
+  formattedText = formattedText.replace(/\*(.*?)\*/g, '<i>$1</i>')
+  
+  // Process underline text (__underline__)
+  formattedText = formattedText.replace(/__(.*?)__/g, '<u>$1</u>')
+  
+  // Process strikethrough text (~~strikethrough~~)
+  formattedText = formattedText.replace(/~~(.*?)~~/g, '<s>$1</s>')
+  
+  // Process links [text](url)
+  formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+  
+  // Restore code blocks
+  codeBlocks.forEach((block, index) => {
+    let replacement
+    if (block.type === 'block') {
+      // Format code block with language
+      replacement = `<pre><code class="${block.language}">${escapeHtml(block.code)}</code></pre>`
+    } else {
+      // Format inline code
+      replacement = `<code>${escapeHtml(block.code)}</code>`
+    }
+    
+    const placeholder = block.type === 'block' 
+      ? `__CODE_BLOCK_${index}__` 
+      : `__INLINE_CODE_${index}__`
+    
+    formattedText = formattedText.replace(placeholder, replacement)
+  })
+  
+  return formattedText
 }
 
 // Helper function for fetch with timeout
