@@ -84,8 +84,8 @@ async function handleUpdate(update) {
       
       if (commandText === '/start') {
         await sendMessage(chatId, 
-          `🤖 <b>Gemini 2.5 Chat Bot</b>\n\n` +
-          `Hello! I'm powered by Google's Gemini 2.5 model. Send me any message and I'll respond as an AI assistant.\n\n` +
+          `🤖 <b>Gemini 2.5 Flash Chat Bot</b>\n\n` +
+          `Hello! I'm powered by Google's Gemini 2.5 Flash model. Send me any message and I'll respond as an AI assistant.\n\n` +
           `Commands:\n` +
           `/start - Welcome message\n` +
           `/help - Show this help message\n\n` +
@@ -120,15 +120,15 @@ async function handleUpdate(update) {
       // Get response from Gemini
       const aiResponse = await getGeminiResponse(chatId, text, update)
       
+      // Format the AI response to convert markdown to HTML
+      const formattedResponse = formatToTelegramHTML(aiResponse)
+      
       // Delete the "Thinking..." message
       if (thinkingMessage && thinkingMessage.ok) {
         await deleteMessage(chatId, thinkingMessage.result.message_id)
       }
       
-      // Format the response for Telegram
-      const formattedResponse = formatForTelegram(aiResponse)
-      
-      // Send the response back to the user
+      // Send the formatted response back to the user
       await sendMessage(chatId, formattedResponse)
     }
   } catch (error) {
@@ -141,9 +141,57 @@ async function handleUpdate(update) {
   }
 }
 
+// Function to convert markdown-like formatting to Telegram HTML
+function formatToTelegramHTML(text) {
+  if (!text) return ''
+  
+  // First escape any existing HTML to prevent injection
+  let formatted = escapeHtml(text)
+  
+  // Convert markdown formatting to HTML tags
+  // Order matters: we process code blocks first to avoid interference
+  
+  // 1. Code blocks (triple backticks)
+  formatted = formatted.replace(/```([\s\S]+?)```/g, '<pre>$1</pre>')
+  
+  // 2. Inline code (single backticks)
+  formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>')
+  
+  // 3. Bold text (**text**)
+  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+  
+  // 4. Italic text (*text*)
+  formatted = formatted.replace(/\*([^*]+)\*/g, '<i>$1</i>')
+  
+  // 5. Underline text (__text__)
+  formatted = formatted.replace(/__([^_]+)__/g, '<u>$1</u>')
+  
+  // 6. Strikethrough text (~text~)
+  formatted = formatted.replace(/~([^~]+)~/g, '<s>$1</s>')
+  
+  // 7. Links [text](url)
+  formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+  
+  // 8. Headers (# Header)
+  formatted = formatted.replace(/^### (.*$)/gm, '<b><i>$1</i></b>')
+  formatted = formatted.replace(/^## (.*$)/gm, '<b>$1</b>')
+  formatted = formatted.replace(/^# (.*$)/gm, '<b><u>$1</u></b>')
+  
+  // 9. Blockquotes (> text)
+  formatted = formatted.replace(/^> (.*$)/gm, '💬 $1')
+  
+  // 10. Horizontal rules (---)
+  formatted = formatted.replace(/^---$/gm, '⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯')
+  
+  // 11. Lists (- item)
+  formatted = formatted.replace(/^- (.*$)/gm, '• $1')
+  
+  return formatted
+}
+
 async function getGeminiResponse(chatId, message, update) {
   try {
-    console.log('Sending message to Gemini 2.5...')
+    console.log('Sending message to Gemini 2.5 Flash...')
     
     // Get the API key from environment variables
     const apiKey = GEMINI_API_KEY
@@ -208,9 +256,9 @@ async function getGeminiResponse(chatId, message, update) {
       ]
     }
     
-    // Use Gemini 2.5 with increased timeout for longer processing
+    // Use Gemini 2.5 Flash with increased timeout for longer processing
     const response = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -247,7 +295,7 @@ async function getGeminiResponse(chatId, message, update) {
         
         // Check if response was truncated due to model's token limit
         if (candidate.finishReason === "MAX_TOKENS") {
-          // Gemini 2.5 has a max output of 8192 tokens
+          // Gemini 2.5 Flash has a max output of 8192 tokens
           responseText += "\n\n⚠️ [Note: Response reached maximum length. The answer may be incomplete. Please ask for more specific details if needed.]"
         }
         
@@ -405,78 +453,6 @@ function escapeHtml(text) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-}
-
-// Format AI response for Telegram HTML
-function formatForTelegram(text) {
-  if (!text) return ''
-  
-  // First, escape HTML special characters
-  let formattedText = escapeHtml(text)
-  
-  // Store code blocks to prevent them from being modified by other formatting
-  const codeBlocks = []
-  let codeIndex = 0
-  
-  // Process code blocks (```language code ```)
-  formattedText = formattedText.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, language, code) => {
-    const placeholder = `__CODE_BLOCK_${codeIndex}__`
-    codeBlocks.push({
-      type: 'block',
-      language: language || '',
-      code: code.trim()
-    })
-    codeIndex++
-    return placeholder
-  })
-  
-  // Process inline code (`code`)
-  formattedText = formattedText.replace(/`([^`]+)`/g, (match, code) => {
-    const placeholder = `__INLINE_CODE_${codeIndex}__`
-    codeBlocks.push({
-      type: 'inline',
-      code: code
-    })
-    codeIndex++
-    return placeholder
-  })
-  
-  // Process bold text (**bold**)
-  formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
-  
-  // Process italic text (*italic*)
-  formattedText = formattedText.replace(/\*(.*?)\*/g, '<i>$1</i>')
-  
-  // Process underline text (__underline__)
-  formattedText = formattedText.replace(/__(.*?)__/g, '<u>$1</u>')
-  
-  // Process strikethrough text (~~strikethrough~~)
-  formattedText = formattedText.replace(/~~(.*?)~~/g, '<s>$1</s>')
-  
-  // Process links [text](url)
-  formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
-  
-  // Restore code blocks
-  codeBlocks.forEach((block, index) => {
-    let replacement
-    if (block.type === 'block') {
-      // Format code block with language
-      replacement = `<pre><code class="${block.language}">${escapeHtml(block.code)}</code></pre>`
-    } else {
-      // Format inline code
-      replacement = `<code>${escapeHtml(block.code)}</code>`
-    }
-    
-    const placeholder = block.type === 'block' 
-      ? `__CODE_BLOCK_${index}__` 
-      : `__INLINE_CODE_${index}__`
-    
-    formattedText = formattedText.replace(placeholder, replacement)
-  })
-  
-  return formattedText
 }
 
 // Helper function for fetch with timeout
