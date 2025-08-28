@@ -84,8 +84,8 @@ async function handleUpdate(update) {
       
       if (commandText === '/start') {
         await sendMessage(chatId, 
-          `🤖 <b>Gemini 2.5 Pro Chat Bot</b>\n\n` +
-          `Hello! I'm powered by Google's Gemini 2.5 Pro model. Send me any message and I'll respond as an AI assistant.\n\n` +
+          `🤖 <b>Gemini 2.5 Chat Bot</b>\n\n` +
+          `Hello! I'm powered by Google's Gemini 2.5 model. Send me any message and I'll respond as an AI assistant.\n\n` +
           `Commands:\n` +
           `/start - Welcome message\n` +
           `/help - Show this help message\n\n` +
@@ -143,7 +143,7 @@ async function handleUpdate(update) {
 
 async function getGeminiResponse(chatId, message, update) {
   try {
-    console.log('Sending message to Gemini 2.5 Pro...')
+    console.log('Sending message to Gemini 2.5...')
     
     // Get the API key from environment variables
     const apiKey = GEMINI_API_KEY
@@ -208,9 +208,9 @@ async function getGeminiResponse(chatId, message, update) {
       ]
     }
     
-    // Use Gemini 2.5 Pro with increased timeout for longer processing
+    // Use Gemini 2.5 with increased timeout for longer processing
     const response = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -247,7 +247,7 @@ async function getGeminiResponse(chatId, message, update) {
         
         // Check if response was truncated due to model's token limit
         if (candidate.finishReason === "MAX_TOKENS") {
-          // Gemini 2.5 Pro has a max output of 8192 tokens
+          // Gemini 2.5 has a max output of 8192 tokens
           responseText += "\n\n⚠️ [Note: Response reached maximum length. The answer may be incomplete. Please ask for more specific details if needed.]"
         }
         
