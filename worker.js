@@ -61,25 +61,37 @@ async function handleUpdate(update) {
     let shouldRespond = !isGroup // Always respond in private chats
     
     if (isGroup) {
+      shouldRespond = false // Default to not respond in groups
+      
       // Check if mentioned/tagged
       if (text.toLowerCase().includes(`@${BOT_USERNAME.toLowerCase()}`)) {
         shouldRespond = true
       }
+      
       // Check if replied to bot's message
       if (update.message.reply_to_message && update.message.reply_to_message.from.id === BOT_ID) {
         shouldRespond = true
       }
     }
     
-    // Handle commands regardless, but check if directed to bot in groups
+    // Handle commands
     if (text.startsWith('/')) {
       let commandText = text.split(' ')[0].toLowerCase()
-      if (isGroup && commandText.includes('@')) {
-        const commandUsername = commandText.split('@')[1].toLowerCase()
-        if (commandUsername !== BOT_USERNAME.toLowerCase()) {
-          return // Command not for this bot
+      
+      // For groups, check if command is directed to this bot
+      if (isGroup) {
+        if (commandText.includes('@')) {
+          const commandUsername = commandText.split('@')[1].toLowerCase()
+          if (commandUsername !== BOT_USERNAME.toLowerCase()) {
+            return // Command not for this bot
+          }
+          commandText = commandText.split('@')[0] // Remove @part
+        } else {
+          // In groups, commands without @username are ignored unless bot is mentioned or replied to
+          if (!shouldRespond) {
+            return
+          }
         }
-        commandText = commandText.split('@')[0] // Remove @part
       }
       
       if (commandText === '/start') {
