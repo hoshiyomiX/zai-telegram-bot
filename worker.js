@@ -50,48 +50,50 @@ async function handleUpdate(update) {
     
     console.log(`Message from ${chatId}: ${text}`)
     
-    // Extract bot ID from token
-    const BOT_ID = TELEGRAM_BOT_TOKEN.split(':')[0]
+    // Extract bot ID from token and convert to number
+    const BOT_ID = parseInt(TELEGRAM_BOT_TOKEN.split(':')[0], 10)
     
-    // Assume BOT_USERNAME is set as an environment variable or hardcode it here
-    // For example: const BOT_USERNAME = 'YourBotUsername' // without @
-    const BOT_USERNAME = TELEGRAM_BOT_USERNAME // Assuming it's defined in environment variables
+    // Assume BOT_USERNAME is set as an environment variable
+    const BOT_USERNAME = TELEGRAM_BOT_USERNAME
+    
+    // Debug logs - hapus setelah debugging selesai
+    console.log(`BOT_ID: ${BOT_ID} (type: ${typeof BOT_ID})`)
+    console.log(`BOT_USERNAME: ${BOT_USERNAME}`)
+    console.log(`Is group: ${isGroup}`)
+    console.log(`Text: ${text}`)
     
     // Determine if should respond in groups
     let shouldRespond = !isGroup // Always respond in private chats
     
     if (isGroup) {
-      shouldRespond = false // Default to not respond in groups
-      
       // Check if mentioned/tagged
-      if (text.toLowerCase().includes(`@${BOT_USERNAME.toLowerCase()}`)) {
-        shouldRespond = true
-      }
+      const hasMention = text.toLowerCase().includes(`@${BOT_USERNAME.toLowerCase()}`)
+      console.log(`Has mention: ${hasMention}`)
       
       // Check if replied to bot's message
-      if (update.message.reply_to_message && update.message.reply_to_message.from.id === BOT_ID) {
-        shouldRespond = true
+      let isReplyToBot = false
+      if (update.message.reply_to_message) {
+        console.log(`Reply to message from: ${update.message.reply_to_message.from.id} (type: ${typeof update.message.reply_to_message.from.id})`)
+        isReplyToBot = update.message.reply_to_message.from.id === BOT_ID
+        console.log(`Is reply to bot: ${isReplyToBot}`)
       }
+      
+      // Set shouldRespond if either condition is true
+      shouldRespond = hasMention || isReplyToBot
     }
     
-    // Handle commands
+    console.log(`Should respond: ${shouldRespond}`)
+    
+    // Handle commands regardless, but check if directed to bot in groups
     if (text.startsWith('/')) {
       let commandText = text.split(' ')[0].toLowerCase()
-      
-      // For groups, check if command is directed to this bot
-      if (isGroup) {
-        if (commandText.includes('@')) {
-          const commandUsername = commandText.split('@')[1].toLowerCase()
-          if (commandUsername !== BOT_USERNAME.toLowerCase()) {
-            return // Command not for this bot
-          }
-          commandText = commandText.split('@')[0] // Remove @part
-        } else {
-          // In groups, commands without @username are ignored unless bot is mentioned or replied to
-          if (!shouldRespond) {
-            return
-          }
+      if (isGroup && commandText.includes('@')) {
+        const commandUsername = commandText.split('@')[1].toLowerCase()
+        if (commandUsername !== BOT_USERNAME.toLowerCase()) {
+          console.log(`Command not for this bot: ${commandUsername} != ${BOT_USERNAME.toLowerCase()}`)
+          return // Command not for this bot
         }
+        commandText = commandText.split('@')[0] // Remove @part
       }
       
       if (commandText === '/start') {
