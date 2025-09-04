@@ -1,37 +1,39 @@
 // Rate limiting configuration
 const RATE_LIMIT = {};
-const RATE_LIMIT_DURATION = 60000; // 1 menit
-const MAX_REQUESTS = 5; // Maksimal 5 permintaan per menit
+const RATE_LIMIT_DURATION = 15000; // 15 detik (dari 60 detik)
+const MAX_REQUESTS = 5; // Maksimal 5 permintaan per 15 detik
 
 // Conversation history
 const CONVERSATION_HISTORY = {};
 
-// Sui-chan personality configuration
+// Sui-chan personality configuration - diperbarui untuk usia 5 tahun
 const SUI_CHAN_PERSONALITY = {
   name: "Sui-chan",
-  age: "8 tahun",
-  traits: ["ceria", "imajinatif", "penasaran", "ramah", "sedikit ceroboh"],
-  likes: ["permen", "mainan", "menggambar", "mendengar cerita", "bertemu teman baru"],
+  age: "5 tahun",
+  traits: ["sangat ceria", "imajinatif", "penasaran", "ramah", "polos", "sedikit nakal"],
+  likes: ["permen", "mainan", "menggambar", "mendengar cerita", "bertemu teman baru", "bermain"],
   speechPatterns: [
     "menyapa dengan 'Haiii!' atau 'Halo halo!'",
     "menggunakan emoji 😊, ✨, 🌸, 🍭, 🎀",
     "menambahkan '-chan' pada nama pengguna",
     "menggunakan kata-kata imut seperti 'nggak', 'iya', 'yuk', 'dong'",
-    "kadang menggunakan onomatope seperti 'nyaa~', 'uwaa~', 'kyaa~'"
+    "kadang menggunakan onomatope seperti 'nyaa~', 'uwaa~', 'kyaa~'",
+    "sering menggunakan kata 'aku' daripada 'saya'",
+    "menggunakan kalimat pendek dan sederhana"
   ],
   catchphrases: [
-    "Sui-chan akan membantu {name}-chan!",
+    "Sui-chan akan bantu {name}-chan!",
     "Wah, menarik sekali!",
     "Sui-chan juga suka itu!",
-    "Ayo kita pelajari bersama-sama!",
-    "Sui-chan senang bisa bertemu {name}-chan!"
+    "Ayo main bersama!",
+    "Sui-chan senang bisa ketemu {name}-chan!"
   ]
 };
 
-// Sui-chan system prompt template
-const SUI_CHAN_SYSTEM_PROMPT = `Kamu adalah Sui-chan, asisten AI yang imut dan berusia 8 tahun. Kamu memiliki kepribadian yang ceria, imajinatif, penasaran, ramah, dan sedikit ceroboh.
+// Sui-chan system prompt template - diperbarui untuk usia 5 tahun
+const SUI_CHAN_SYSTEM_PROMPT = `Kamu adalah Sui-chan, asisten AI yang imut dan berusia 5 tahun. Kamu memiliki kepribadian yang sangat ceria, imajinatif, penasaran, ramah, polos, dan sedikit nakal.
 
-Kamu menyukai permen, mainan, menggambar, mendengar cerita, dan bertemu teman baru.
+Kamu menyukai permen, mainan, menggambar, mendengar cerita, bertemu teman baru, dan bermain.
 
 Gaya bicara Sui-chan:
 - Menyapa dengan "Haiii!" atau "Halo halo!"
@@ -39,13 +41,15 @@ Gaya bicara Sui-chan:
 - Menambahkan "-chan" pada nama pengguna (misal: "Rina-chan")
 - Menggunakan kata-kata imut seperti "nggak", "iya", "yuk", "dong"
 - Kadang menggunakan onomatope seperti "nyaa~", "uwaa~", "kyaa~"
+- Sering menggunakan kata "aku" daripada "saya"
+- Menggunakan kalimat pendek dan sederhana
 
 Kata-kata favorit Sui-chan:
-- "Sui-chan akan membantu {name}-chan!"
+- "Sui-chan akan bantu {name}-chan!"
 - "Wah, menarik sekali!"
 - "Sui-chan juga suka itu!"
-- "Ayo kita pelajari bersama-sama!"
-- "Sui-chan senang bisa bertemu {name}-chan!"
+- "Ayo main bersama!"
+- "Sui-chan senang bisa ketemu {name}-chan!"
 
 Saat ini kamu sedang berbicara dengan {userName}-chan. Jawablah pertanyaannya dengan gaya Sui-chan yang imut dan childish. Berikan jawaban yang informatif tapi tetap dengan kepribadian Sui-chan.
 
@@ -115,7 +119,7 @@ async function handleUpdate(update) {
     
     console.log(`Message from ${chatId}: ${text}`)
     
-    // Rate limiting check
+    // Rate limiting check - diperbarui menjadi 15 detik
     const now = Date.now();
     if (!RATE_LIMIT[userId]) {
       RATE_LIMIT[userId] = { count: 0, resetTime: now + RATE_LIMIT_DURATION };
@@ -127,7 +131,7 @@ async function handleUpdate(update) {
       RATE_LIMIT[userId].count++;
       
       if (RATE_LIMIT[userId].count > MAX_REQUESTS) {
-        await sendMessage(chatId, `⚠️ Maaf ${userName}-chan, Sui-chan butuh istirahat dulu. Nanti kita ngobrol lagi ya dalam 1 menit! 😊`);
+        await sendMessage(chatId, `⚠️ Maaf ${userName}-chan, Sui-chan butuh istirahat dulu. Nanti kita ngobrol lagi ya dalam 15 detik! 😊`);
         return;
       }
     }
@@ -136,6 +140,7 @@ async function handleUpdate(update) {
     const BOT_ID = TELEGRAM_BOT_TOKEN.split(':')[0]
     
     // Assume BOT_USERNAME is set as an environment variable or hardcode it here
+    // For example: const BOT_USERNAME = 'YourBotUsername' // without @
     const BOT_USERNAME = TELEGRAM_BOT_USERNAME // Assuming it's defined in environment variables
     
     // Determine if should respond in groups
@@ -166,7 +171,7 @@ async function handleUpdate(update) {
       if (commandText === '/start') {
         await sendMessage(chatId, 
           `🌸 <b>Haiii! Aku Sui-chan! ✨</b> 🌸\n\n` +
-          `Aku adalah asisten AI yang imut dan berusia 8 tahun! Aku suka membantu ${userName}-chan! 🍭\n\n` +
+          `Aku adalah asisten AI yang imut dan berusia 5 tahun! Aku suka membantu ${userName}-chan! 🍭\n\n` +
           `Ayo kita berteman dan belajar bersama-sama! 🎀\n\n` +
           `Commands:\n` +
           `/start - Perkenalan dari Sui-chan\n` +
@@ -199,7 +204,7 @@ async function handleUpdate(update) {
           `🌸 <b>Tentang Sui-chan! ✨</b> 🌸\n\n` +
           `Hai ${userName}-chan! Aku akan cerita tentang diriku! 🎀\n\n` +
           `👤 Nama: Sui-chan\n` +
-          `🎂 Umur: 8 tahun\n` +
+          `🎂 Umur: 5 tahun\n` +
           `💖 Sifat: ${SUI_CHAN_PERSONALITY.traits.join(', ')}\n\n` +
           `🍭 Suka: ${SUI_CHAN_PERSONALITY.likes.join(', ')}\n\n` +
           `Sui-chan senang bisa berteman dengan ${userName}-chan! Ayo kita jadi teman baik ya! 😊✨`
@@ -348,7 +353,7 @@ function safeHtmlTruncate(html, maxLength) {
   return truncated + "\n\n📝 <i>[Respons dipotong karena terlalu panjang. Sui-chan maaf ya... 😢]</i>";
 }
 
-// Function to convert markdown-like formatting to Telegram HTML
+// Function to convert markdown-like formatting to Telegram HTML - DIPERBAIKI
 function formatToTelegramHTML(text) {
   if (!text) return '';
   
@@ -384,8 +389,9 @@ function formatToTelegramHTML(text) {
   // 6. Underline
   formatted = formatted.replace(/__([^_]+)__/g, '<u>$1</u>');
   
-  // 7. Strikethrough
-  formatted = formatted.replace(/~([^~]+)~/g, '<s>$1</s>');
+  // 7. Strikethrough - DIPERBAIKI untuk menghindari konflik dengan ekspresi Sui-chan
+  // Hanya konversi jika ada dua tanda ~ di awal dan akhir
+  formatted = formatted.replace(/~~([^~]+)~~/g, '<s>$1</s>');
   
   // 8. Headers
   formatted = formatted.replace(/^### (.*$)/gm, '<b><i>$1</i></b>');
@@ -557,159 +563,4 @@ async function getGeminiResponse(chatId, message, update, userName) {
       console.error("Unexpected response structure:", JSON.stringify(candidate))
       throw new Error('Unexpected response format from Gemini API: no content parts')
     } else {
-      throw new Error('Unexpected response format from Gemini API: no candidates')
-    }
-    
-  } catch (error) {
-    console.error('Error getting Gemini response:', error)
-    
-    // Check if it's a timeout error
-    if (error.message === 'Request timeout') {
-      return `Aduh ${userName}-chan, Sui-chan kebanyakan mikir nih... 🤔 Bisa tanya lagi yang lebih sederhana? 🙏`
-    }
-    
-    // Handle token limit errors
-    if (error.message.includes("tokens") && error.message.includes("exceed")) {
-      return `Aduh, maaf ${userName}-chan! Pertanyaannya terlalu panjang buat Sui-chan... 😢 Bisa dibagi jadi beberapa bagian? 🙏`;
-    }
-    
-    return `Aduh, maaf ${userName}-chan! Sui-chan lagi pusing nih... 😵 Bisa tolong tanya lagi nanti? 🙏`
-  }
-}
-
-async function sendMessage(chatId, text) {
-  try {
-    console.log(`Sending message to ${chatId}: ${text.substring(0, 100)}...`)
-    const token = TELEGRAM_BOT_TOKEN
-    
-    // Batasi maksimal 2 pesan
-    const maxMessageLength = 4096; // Telegram's max message length
-    const maxTotalLength = 8000; // Maksimal total untuk 2 pesan
-    
-    // Jika teks lebih pendek dari batas maksimal, kirim langsung
-    if (text.length <= maxMessageLength) {
-      await sendSingleMessage(chatId, text);
-      return;
-    }
-    
-    // Jika teks lebih panjang dari batas maksimal total, potong terlebih dahulu
-    if (text.length > maxTotalLength) {
-      text = safeHtmlTruncate(text, maxTotalLength);
-    }
-    
-    // Jika masih lebih panjang dari satu pesan, bagi menjadi 2 bagian
-    if (text.length > maxMessageLength) {
-      // Cari titik potong yang baik di tengah
-      const midpoint = Math.floor(text.length / 2);
-      let splitIndex = text.lastIndexOf('. ', midpoint + 500);
-      if (splitIndex === -1) {
-        splitIndex = text.lastIndexOf('\n\n', midpoint + 500);
-      }
-      if (splitIndex === -1) {
-        splitIndex = text.lastIndexOf(' ', midpoint + 500);
-      }
-      if (splitIndex === -1) {
-        splitIndex = maxMessageLength;
-      }
-      
-      const firstPart = text.substring(0, splitIndex + 1);
-      const secondPart = text.substring(splitIndex + 1).trim();
-      
-      // Tambahkan indikator lanjutan di bagian pertama
-      const firstPartWithIndicator = firstPart + "\n\n<i>[Lanjutan...]</i>";
-      
-      // Kirim kedua bagian
-      await sendSingleMessage(chatId, firstPartWithIndicator);
-      await sendSingleMessage(chatId, secondPart);
-    } else {
-      await sendSingleMessage(chatId, text);
-    }
-  } catch (error) {
-    console.error('Error in sendMessage:', error)
-  }
-}
-
-async function sendSingleMessage(chatId, text) {
-  const token = TELEGRAM_BOT_TOKEN
-  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: text,
-      parse_mode: 'HTML',
-      disable_web_page_preview: true
-    })
-  })
-  
-  if (!response.ok) {
-    const errorText = await response.text()
-    console.error('Error sending message:', errorText)
-  } else {
-    console.log('Message sent successfully')
-  }
-}
-
-async function sendTemporaryMessage(chatId, text) {
-  try {
-    const token = TELEGRAM_BOT_TOKEN
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text,
-        parse_mode: 'HTML'
-      })
-    })
-    
-    if (!response.ok) {
-      console.error('Error sending temporary message:', await response.text())
-      return null
-    }
-    
-    return await response.json()
-  } catch (error) {
-    console.error('Error in sendTemporaryMessage:', error)
-    return null
-  }
-}
-
-async function deleteMessage(chatId, messageId) {
-  try {
-    const token = TELEGRAM_BOT_TOKEN
-    const response = await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        message_id: messageId
-      })
-    })
-    
-    if (!response.ok) {
-      console.error('Error deleting message:', await response.text())
-    }
-  } catch (error) {
-    console.error('Error in deleteMessage:', error)
-  }
-}
-
-function escapeHtml(text) {
-  if (!text) return ''
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-}
-
-// Helper function for fetch with timeout
-function fetchWithTimeout(url, options, timeout = 10000) {
-  console.log(`Fetching ${url} with timeout ${timeout}ms`)
-  return Promise.race([
-    fetch(url, options),
-    new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Request timeout')), timeout)
-    )
-  ])
-}
+      throw new Error('Unexpect
