@@ -1,6 +1,6 @@
 // Rate limiting configuration
 const RATE_LIMIT = {};
-const RATE_LIMIT_DURATION = 15000; // 15 detik (dari 60 detik)
+const RATE_LIMIT_DURATION = 15000; // 15 detik
 const MAX_REQUESTS = 5; // Maksimal 5 permintaan per 15 detik
 
 // Conversation history
@@ -563,4 +563,4 @@ async function getGeminiResponse(chatId, message, update, userName) {
       console.error("Unexpected response structure:", JSON.stringify(candidate))
       throw new Error('Unexpected response format from Gemini API: no content parts')
     } else {
-      throw new Error('Unexpect
+      throw new Error('Unexpected response form
