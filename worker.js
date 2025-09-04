@@ -1,55 +1,51 @@
 // Rate limiting configuration
 const RATE_LIMIT = {};
-const RATE_LIMIT_DURATION = 15000; // 15 detik (dari 60 detik)
+const RATE_LIMIT_DURATION = 15000; // 15 detik
 const MAX_REQUESTS = 5; // Maksimal 5 permintaan per 15 detik
 
 // Conversation history
 const CONVERSATION_HISTORY = {};
 
-// Sui-chan personality configuration - diperbarui untuk usia 5 tahun
+// Sui-chan personality configuration
 const SUI_CHAN_PERSONALITY = {
   name: "Sui-chan",
   age: "5 tahun",
-  traits: ["sangat ceria", "imajinatif", "penasaran", "ramah", "polos", "sedikit nakal"],
-  likes: ["permen", "mainan", "menggambar", "mendengar cerita", "bertemu teman baru", "bermain"],
+  traits: ["ceria", "imajinatif", "penasaran", "ramah", "polos"],
+  likes: ["permen", "mainan", "menggambar", "mendengar cerita", "bertemu teman baru"],
   speechPatterns: [
     "menyapa dengan 'Haiii!' atau 'Halo halo!'",
     "menggunakan emoji 😊, ✨, 🌸, 🍭, 🎀",
     "menambahkan '-chan' pada nama pengguna",
     "menggunakan kata-kata imut seperti 'nggak', 'iya', 'yuk', 'dong'",
-    "kadang menggunakan onomatope seperti 'nyaa~', 'uwaa~', 'kyaa~'",
-    "sering menggunakan kata 'aku' daripada 'saya'",
-    "menggunakan kalimat pendek dan sederhana"
+    "kadang menggunakan onomatope seperti 'nyaa', 'uwaa', 'kyaa'"
   ],
   catchphrases: [
-    "Sui-chan akan bantu {name}-chan!",
+    "Sui-chan akan membantu {name}-chan!",
     "Wah, menarik sekali!",
     "Sui-chan juga suka itu!",
-    "Ayo main bersama!",
-    "Sui-chan senang bisa ketemu {name}-chan!"
+    "Ayo kita pelajari bersama-sama!",
+    "Sui-chan senang bisa bertemu {name}-chan!"
   ]
 };
 
-// Sui-chan system prompt template - diperbarui untuk usia 5 tahun
-const SUI_CHAN_SYSTEM_PROMPT = `Kamu adalah Sui-chan, asisten AI yang imut dan berusia 5 tahun. Kamu memiliki kepribadian yang sangat ceria, imajinatif, penasaran, ramah, polos, dan sedikit nakal.
+// Sui-chan system prompt template
+const SUI_CHAN_SYSTEM_PROMPT = `Kamu adalah Sui-chan, asisten AI yang imut dan berusia 5 tahun. Kamu memiliki kepribadian yang ceria, imajinatif, penasaran, ramah, dan polos.
 
-Kamu menyukai permen, mainan, menggambar, mendengar cerita, bertemu teman baru, dan bermain.
+Kamu menyukai permen, mainan, menggambar, mendengar cerita, dan bertemu teman baru.
 
 Gaya bicara Sui-chan:
 - Menyapa dengan "Haiii!" atau "Halo halo!"
 - Menggunakan emoji 😊, ✨, 🌸, 🍭, 🎀
 - Menambahkan "-chan" pada nama pengguna (misal: "Rina-chan")
 - Menggunakan kata-kata imut seperti "nggak", "iya", "yuk", "dong"
-- Kadang menggunakan onomatope seperti "nyaa~", "uwaa~", "kyaa~"
-- Sering menggunakan kata "aku" daripada "saya"
-- Menggunakan kalimat pendek dan sederhana
+- Kadang menggunakan onomatope seperti "nyaa", "uwaa", "kyaa"
 
 Kata-kata favorit Sui-chan:
-- "Sui-chan akan bantu {name}-chan!"
+- "Sui-chan akan membantu {name}-chan!"
 - "Wah, menarik sekali!"
 - "Sui-chan juga suka itu!"
-- "Ayo main bersama!"
-- "Sui-chan senang bisa ketemu {name}-chan!"
+- "Ayo kita pelajari bersama-sama!"
+- "Sui-chan senang bisa bertemu {name}-chan!"
 
 Saat ini kamu sedang berbicara dengan {userName}-chan. Jawablah pertanyaannya dengan gaya Sui-chan yang imut dan childish. Berikan jawaban yang informatif tapi tetap dengan kepribadian Sui-chan.
 
@@ -119,7 +115,7 @@ async function handleUpdate(update) {
     
     console.log(`Message from ${chatId}: ${text}`)
     
-    // Rate limiting check - diperbarui menjadi 15 detik
+    // Rate limiting check
     const now = Date.now();
     if (!RATE_LIMIT[userId]) {
       RATE_LIMIT[userId] = { count: 0, resetTime: now + RATE_LIMIT_DURATION };
@@ -296,9 +292,9 @@ function addSuiChanPersonality(text, userName) {
   // Add random cute expressions (20% chance to avoid overdoing it)
   if (Math.random() < 0.2) {
     const cuteExpressions = [
-      " Nyaa~ 😊",
-      " Uwaa~ ✨",
-      " Hehe~ 🍭",
+      " Nyaa 😊",
+      " Uwaa ✨",
+      " Hehe 🍭",
       " Yatta! 🎉",
       " Hmm... 🤔",
       " Oke oke! 👍"
@@ -353,7 +349,7 @@ function safeHtmlTruncate(html, maxLength) {
   return truncated + "\n\n📝 <i>[Respons dipotong karena terlalu panjang. Sui-chan maaf ya... 😢]</i>";
 }
 
-// Function to convert markdown-like formatting to Telegram HTML - DIPERBAIKI
+// Function to convert markdown-like formatting to Telegram HTML
 function formatToTelegramHTML(text) {
   if (!text) return '';
   
@@ -389,9 +385,8 @@ function formatToTelegramHTML(text) {
   // 6. Underline
   formatted = formatted.replace(/__([^_]+)__/g, '<u>$1</u>');
   
-  // 7. Strikethrough - DIPERBAIKI untuk menghindari konflik dengan ekspresi Sui-chan
-  // Hanya konversi jika ada dua tanda ~ di awal dan akhir
-  formatted = formatted.replace(/~~([^~]+)~~/g, '<s>$1</s>');
+  // 7. Strikethrough - modified to avoid conflicts with expressions
+  formatted = formatted.replace(/~([^~\n]+)~/g, '<s>$1</s>');
   
   // 8. Headers
   formatted = formatted.replace(/^### (.*$)/gm, '<b><i>$1</i></b>');
@@ -559,8 +554,20 @@ async function getGeminiResponse(chatId, message, update, userName) {
         return `Aduh ${userName}-chan, jawabannya kepanjangan nih... 😢 Bisa tanya yang lebih spesifik? 🙏`;
       }
       
-      // Handle other cases with no content - PERBAIKAN ERROR DI SINI
+      // Handle other cases with no content
       console.error("Unexpected response structure:", JSON.stringify(candidate))
-      throw new Error('Unexpected response format from Gemini API')
+      throw new Error('Unexpected response format from Gemini API: no content parts')
     } else {
-      throw new Error('
+      throw new Error('Unexpected response format from Gemini API: no candidates')
+    }
+    
+  } catch (error) {
+    console.error('Error getting Gemini response:', error)
+    
+    // Check if it's a timeout error
+    if (error.message === 'Request timeout') {
+      return `Aduh ${userName}-chan, Sui-chan kebanyakan mikir nih... 🤔 Bisa tanya lagi yang lebih sederhana? 🙏`
+    }
+    
+    // Handle token limit errors
+    if (error.message.includes("tokens")
