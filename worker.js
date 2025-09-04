@@ -1,7 +1,7 @@
 // Rate limiting configuration
 const RATE_LIMIT = {};
-const RATE_LIMIT_DURATION = 15000; // 15 detik
-const MAX_REQUESTS = 5; // Maksimal 5 permintaan per 15 detik
+const RATE_LIMIT_DURATION = 60000; // 1 menit
+const MAX_REQUESTS = 5; // Maksimal 5 permintaan per menit
 
 // Conversation history
 const CONVERSATION_HISTORY = {};
@@ -17,7 +17,7 @@ const SUI_CHAN_PERSONALITY = {
     "menggunakan emoji 😊, ✨, 🌸, 🍭, 🎀",
     "menambahkan '-chan' pada nama pengguna",
     "menggunakan kata-kata imut seperti 'nggak', 'iya', 'yuk', 'dong'",
-    "kadang menggunakan onomatope seperti 'nyaa', 'uwaa', 'kyaa'"
+    "kadang menggunakan onomatope seperti 'nyaa~', 'uwaa~', 'kyaa~'"
   ],
   catchphrases: [
     "Sui-chan akan membantu {name}-chan!",
@@ -38,7 +38,8 @@ Gaya bicara Sui-chan:
 - Menggunakan emoji 😊, ✨, 🌸, 🍭, 🎀
 - Menambahkan "-chan" pada nama pengguna (misal: "Rina-chan")
 - Menggunakan kata-kata imut seperti "nggak", "iya", "yuk", "dong"
-- Kadang menggunakan onomatope seperti "nyaa", "uwaa", "kyaa"
+- Kadang menggunakan onomatope seperti "nyaa~", "uwaa~", "kyaa~"
+- Tidak menggunakan coret-coret (strikethrough) dalam bicara
 
 Kata-kata favorit Sui-chan:
 - "Sui-chan akan membantu {name}-chan!"
@@ -53,8 +54,9 @@ Ingat:
 1. Selalu gunakan gaya bahasa Sui-chan yang imut dan childish
 2. Tambahkan emoji yang sesuai dengan suasana
 3. Berikan jawaban yang ramah dan menyenangkan
-4. Jika tidak tahu jawabannya, katakan dengan jujur tapi tetap dengan gaya Sui-chan
-5. Akhiri jawaban dengan tanda tangan "~ Sui-chan ✨🌸"
+4. Jangan pernah menggunakan coret-coret (strikethrough) dalam jawaban
+5. Jika tidak tahu jawabannya, katakan dengan jujur tapi tetap dengan gaya Sui-chan
+6. Akhiri jawaban dengan tanda tangan "~ Sui-chan ✨🌸"
 
 Contoh jawaban Sui-chan:
 "Haiii {userName}-chan! 😊✨ Tentu saja Sui-chan akan bantu menjelaskan! [jawaban informatif] Semoga membantu ya! ~ Sui-chan ✨🌸"
@@ -127,7 +129,7 @@ async function handleUpdate(update) {
       RATE_LIMIT[userId].count++;
       
       if (RATE_LIMIT[userId].count > MAX_REQUESTS) {
-        await sendMessage(chatId, `⚠️ Maaf ${userName}-chan, Sui-chan butuh istirahat dulu. Nanti kita ngobrol lagi ya dalam 15 detik! 😊`);
+        await sendMessage(chatId, `⚠️ Maaf ${userName}-chan, Sui-chan butuh istirahat dulu. Nanti kita ngobrol lagi ya dalam 1 menit! 😊`);
         return;
       }
     }
@@ -292,9 +294,9 @@ function addSuiChanPersonality(text, userName) {
   // Add random cute expressions (20% chance to avoid overdoing it)
   if (Math.random() < 0.2) {
     const cuteExpressions = [
-      " Nyaa 😊",
-      " Uwaa ✨",
-      " Hehe 🍭",
+      " Nyaa~ 😊",
+      " Uwaa~ ✨",
+      " Hehe~ 🍭",
       " Yatta! 🎉",
       " Hmm... 🤔",
       " Oke oke! 👍"
@@ -385,8 +387,8 @@ function formatToTelegramHTML(text) {
   // 6. Underline
   formatted = formatted.replace(/__([^_]+)__/g, '<u>$1</u>');
   
-  // 7. Strikethrough - modified to avoid conflicts with expressions
-  formatted = formatted.replace(/~([^~\n]+)~/g, '<s>$1</s>');
+  // 7. Strikethrough - DIHAPUS sesuai permintaan
+  // formatted = formatted.replace(/~([^~]+)~/g, '<s>$1</s>');
   
   // 8. Headers
   formatted = formatted.replace(/^### (.*$)/gm, '<b><i>$1</i></b>');
@@ -503,7 +505,7 @@ async function getGeminiResponse(chatId, message, update, userName) {
       ]
     }
     
-    // Use Gemini 2.5 Flash with increased timeout for longer processing
+    // Use Gemini 2.5 Flash with timeout of 15 seconds
     const response = await fetchWithTimeout(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
@@ -514,7 +516,7 @@ async function getGeminiResponse(chatId, message, update, userName) {
         },
         body: JSON.stringify(requestBody)
       },
-      120000 // Increased to 120 seconds (2 minutes) timeout
+      15000 // Timeout diubah menjadi 15 detik sesuai permintaan
     )
     
     if (!response.ok) {
@@ -566,8 +568,4 @@ async function getGeminiResponse(chatId, message, update, userName) {
     
     // Check if it's a timeout error
     if (error.message === 'Request timeout') {
-      return `Aduh ${userName}-chan, Sui-chan kebanyakan mikir nih... 🤔 Bisa tanya lagi yang lebih sederhana? 🙏`
-    }
-    
-    // Handle token limit errors
-    if (error.message.includes("tokens")
+      return `Aduh ${userName}-chan, Sui-chan kebanyakan mikir nih... 🤔 Bisa tanya lagi yang l
