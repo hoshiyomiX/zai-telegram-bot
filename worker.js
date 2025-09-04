@@ -573,4 +573,143 @@ async function getGeminiResponse(chatId, message, update, userName) {
       return `Aduh, maaf ${userName}-chan! Pertanyaannya terlalu panjang buat Sui-chan... 😢 Bisa dibagi jadi beberapa bagian? 🙏`;
     }
     
-    r
+    return `Aduh, maaf ${userName}-chan! Sui-chan lagi pusing nih... 😵 Bisa tolong tanya lagi nanti? 🙏`
+  }
+}
+
+async function sendMessage(chatId, text) {
+  try {
+    console.log(`Sending message to ${chatId}: ${text.substring(0, 100)}...`)
+    const token = TELEGRAM_BOT_TOKEN
+    
+    // Batasi maksimal 2 pesan
+    const maxMessageLength = 4096; // Telegram's max message length
+    const maxTotalLength = 8000; // Maksimal total untuk 2 pesan
+    
+    // Jika teks lebih pendek dari batas maksimal, kirim langsung
+    if (text.length <= maxMessageLength) {
+      await sendSingleMessage(chatId, text);
+      return;
+    }
+    
+    // Jika teks lebih panjang dari batas maksimal total, potong terlebih dahulu
+    if (text.length > maxTotalLength) {
+      text = safeHtmlTruncate(text, maxTotalLength);
+    }
+    
+    // Jika masih lebih panjang dari satu pesan, bagi menjadi 2 bagian
+    if (text.length > maxMessageLength) {
+      // Cari titik potong yang baik di tengah
+      const midpoint = Math.floor(text.length / 2);
+      let splitIndex = text.lastIndexOf('. ', midpoint + 500);
+      if (splitIndex === -1) {
+        splitIndex = text.lastIndexOf('\n\n', midpoint + 500);
+      }
+      if (splitIndex === -1) {
+        splitIndex = text.lastIndexOf(' ', midpoint + 500);
+      }
+      if (splitIndex === -1) {
+        splitIndex = maxMessageLength;
+      }
+      
+      const firstPart = text.substring(0, splitIndex + 1);
+      const secondPart = text.substring(splitIndex + 1).trim();
+      
+      // Tambahkan indikator lanjutan di bagian pertama
+      const firstPartWithIndicator = firstPart + "\n\n<i>[Lanjutan...]</i>";
+      
+      // Kirim kedua bagian
+      await sendSingleMessage(chatId, firstPartWithIndicator);
+      await sendSingleMessage(chatId, secondPart);
+    } else {
+      await sendSingleMessage(chatId, text);
+    }
+  } catch (error) {
+    console.error('Error in sendMessage:', error)
+  }
+}
+
+async function sendSingleMessage(chatId, text) {
+  const token = TELEGRAM_BOT_TOKEN
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true
+    })
+  })
+  
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('Error sending message:', errorText)
+  } else {
+    console.log('Message sent successfully')
+  }
+}
+
+async function sendTemporaryMessage(chatId, text) {
+  try {
+    const token = TELEGRAM_BOT_TOKEN
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: text,
+        parse_mode: 'HTML'
+      })
+    })
+    
+    if (!response.ok) {
+      console.error('Error sending temporary message:', await response.text())
+      return null
+    }
+    
+    return await response.json()
+  } catch (error) {
+    console.error('Error in sendTemporaryMessage:', error)
+    return null
+  }
+}
+
+async function deleteMessage(chatId, messageId) {
+  try {
+    const token = TELEGRAM_BOT_TOKEN
+    const response = await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId
+      })
+    })
+    
+    if (!response.ok) {
+      console.error('Error deleting message:', await response.text())
+    }
+  } catch (error) {
+    console.error('Error in deleteMessage:', error)
+  }
+}
+
+function escapeHtml(text) {
+  if (!text) return ''
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+// Helper function for fetch with timeout
+function fetchWithTimeout(url, options, timeout = 10000) {
+  console.log(`Fetching ${url} with timeout ${timeout}ms`)
+  return Promise.race([
+    fetch(url, options),
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Request timeout')), timeout)
+    )
+  ])
+}
