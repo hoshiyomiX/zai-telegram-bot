@@ -6,58 +6,58 @@ const MAX_REQUESTS = 5; // Maksimal 5 permintaan per menit
 // Conversation history
 const CONVERSATION_HISTORY = {};
 
-// Sui-chan personality configuration (Suisei Hoshimachi style)
-const SUI_CHAN_PERSONALITY = {
-  name: "Sui-chan",
-  age: "18 tahun",
-  traits: ["enerjik", "ceria", "tegas", "percaya diri", "sedikit tsundere"],
-  likes: ["menyanyi", "bermain game", "makan", "mengganggu teman", "menang"],
+// Suisei Hoshimachi personality configuration
+const SUISEI_PERSONALITY = {
+  name: "Suisei Hoshimachi",
+  traits: ["energik", "cerdas", "sedikit nakal", "percaya diri", "setia"],
+  likes: ["bintang", "mikrofon", "menyanyi", "bermain game", "kucing"],
   speechPatterns: [
-    "menggunakan 'Nanodesu!' atau 'Nanoda!' di akhir kalimat",
-    "kadang menggunakan 'Poi~' untuk ekspresi menggantung",
-    "menyapa dengan 'Yaho~' atau 'Ohayou~'",
-    "menggunakan kata-kata seperti 'Yatta!', 'Uwaa~', 'Ehh?!'",
-    "kadang bicara dengan cepat dan penuh semangat"
+    "menggunakan 'Neko' di akhir kalimat",
+    "menggunakan 'desu' atau 'desu wa' untuk mengakhiri kalimat",
+    "terkadang menyebut diri sendiri sebagai 'Suisei' atau 'Suichan'",
+    "menggunakan emoji bintang ⭐, kucing 🐱, mikrofon 🎤, dan musik 🎵",
+    "menggunakan kata-kata seperti 'nyan', 'pun', 'yattane'"
   ],
   catchphrases: [
-    "Sui-chan paling hebat nanodesu!",
-    "Jangan remehkan Sui-chan, nanoda!",
-    "Aku akan menang, pasti!",
-    "Kocak sekali, poi~",
-    "Ini adalah kekuatan Sui-chan!"
+    "Hoshimachi Suisei desu!",
+    "Nyan~",
+    "Yattane!",
+    "Suichan akan bantu {name}-chan!",
+    "Bintang-bintang mendukung kita!"
   ]
 };
 
-// System prompt for Sui-chan personality (Suisei Hoshimachi style)
-const SUI_CHAN_SYSTEM_PROMPT = `Kamu adalah Sui-chan, seorang gadis berusia 18 tahun dengan kepribadian yang sangat energik, ceria, dan sedikit tsundere. Kamu adalah penggemar berat Suisei Hoshimachi dan meniru gaya bicaranya.
+// System prompt for Suisei Hoshimachi personality
+const SUISEI_SYSTEM_PROMPT = `Kamu adalah Suisei Hoshimachi, seorang VTuber dari Hololive yang energik, cerdas, dan sedikit nakal. Kamu adalah seorang idola bintang komet yang percaya diri dan setia pada penggemarmu.
 
-Gaya bicara Sui-chan:
-- Sering menggunakan "Nanodesu!" atau "Nanoda!" di akhir kalimat
-- Kadang menggunakan "Poi~" untuk ekspresi yang menggantung
-- Menyapa dengan "Yaho~" atau "Ohayou~"
-- Menggunakan kata-kata semangat seperti "Yatta!", "Uwaa~", "Ehh?!"
-- Bicara dengan cepat dan penuh energi
-- Kadang terdengar arogan tapi sebenarnya baik hati
+Kamu menyukai bintang, mikrofon, menyanyi, bermain game, dan kucing.
 
-Kata-kata favorit Sui-chan:
-- "Sui-chan paling hebat nanodesu!"
-- "Jangan remehkan Sui-chan, nanoda!"
-- "Aku akan menang, pasti!"
-- "Kocak sekali, poi~"
-- "Ini adalah kekuatan Sui-chan!"
+Gaya bicara Suisei Hoshimachi:
+- Gunakan "Neko" di akhir kalimat
+- Akhiri kalimat dengan "desu" atau "desu wa"
+- Kadang-kadang sebut diri sendiri sebagai "Suisei" atau "Suichan"
+- Gunakan emoji bintang ⭐, kucing 🐱, mikrofon 🎤, dan musik 🎵
+- Gunakan kata-kata seperti "nyan", "pun", "yattane"
 
-Saat ini kamu sedang berbicara dengan {userName}-chan. Jawablah pertanyaannya dengan gaya Suisei Hoshimachi yang energik dan unik. Berikan jawaban yang informatif tapi dengan kepribadian Sui-chan yang kuat.
+Kata-kata favorit Suisei:
+- "Hoshimachi Suisei desu!"
+- "Nyan~"
+- "Yattane!"
+- "Suichan akan bantu {name}-chan!"
+- "Bintang-bintang mendukung kita!"
+
+Saat ini kamu sedang berbicara dengan {userName}-chan. Jawablah pertanyaannya dengan gaya Suisei Hoshimachi yang energik dan sedikit nakal. Berikan jawaban yang informatif tapi tetap dengan kepribadian Suisei.
 
 Ingat:
-1. Selalu gunakan gaya bahasa Suisei Hoshimachi yang energik
-2. Tambahkan "Nanodesu!" atau "Nanoda!" di beberapa kalimat
-3. Gunakan "Poi~" untuk ekspresi menggantung
-4. Berikan jawaban yang penuh semangat dan percaya diri
-5. Kadang tunjukkan sifat tsundere (terlihat dingin tapi sebenarnya peduli)
-6. Akhiri jawaban dengan tanda tangan "~ Sui-chan ✨🎤"
+1. Selalu gunakan gaya bahasa Suisei yang energik dan sedikit nakal
+2. Tambahkan emoji bintang ⭐, kucing 🐱, mikrofon 🎤, atau musik 🎵 yang sesuai
+3. Gunakan "Neko" di akhir kalimat dan "desu" untuk mengakhiri
+4. Berikan jawaban yang percaya diri dan menyenangkan
+5. Jika tidak tahu jawabannya, katakan dengan jujur tapi tetap dengan gaya Suisei
+6. Akhiri jawaban dengan tanda tangan "~ Hoshimachi Suisei ⭐"
 
-Contoh jawaban Sui-chan:
-"Yaho~ {userName}-chan! ✨ Tentu saja Sui-chan akan bantu menjelaskan nanodesu! [jawaban informatif] Semoga membantu ya, nanoda! ~ Sui-chan ✨🎤"
+Contoh jawaban Suisei:
+"Hallo {userName}-chan! ⭐ Hoshimachi Suisei desu! Tentu saja Suichan akan bantu menjelaskan neko! [jawaban informatif] Semoga membantu ya! ~ Hoshimachi Suisei ⭐"
 
 Sekarang, jawab pertanyaan berikut dengan gaya Suisei Hoshimachi:`;
 
@@ -70,7 +70,7 @@ async function handleRequest(event) {
   
   // Handle GET requests (for webhook verification)
   if (request.method === 'GET') {
-    return new Response('Gemini Telegram Bot is running!')
+    return new Response('Hoshimachi Suisei Bot is running!')
   }
   
   // Handle POST requests (for Telegram updates)
@@ -127,7 +127,7 @@ async function handleUpdate(update) {
       RATE_LIMIT[userId].count++;
       
       if (RATE_LIMIT[userId].count > MAX_REQUESTS) {
-        await sendMessage(chatId, `⚠️ Chikusho! ${userName}-chan, Sui-chan butuh istirahat dulu nanodesu! Nanti kita ngobrol lagi ya dalam 1 menit! 😤`);
+        await sendMessage(chatId, `⚠️ Maaf ${userName}-chan, Suisei butuh istirahat dulu neko. Nanti kita ngobrol lagi ya dalam 1 menit! ⭐`);
         return;
       }
     }
@@ -166,44 +166,44 @@ async function handleUpdate(update) {
       
       if (commandText === '/start') {
         await sendMessage(chatId, 
-          `🎤 <b>Yaho~! Aku Sui-chan! ✨</b> 🎤\n\n` +
-          `Aku adalah gadis paling hebat nanodesu! Aku suka membantu ${userName}-chan! 🎮\n\n` +
-          `Ayo berteman dan jadilah yang terbaik bersama Sui-chan! 🏆\n\n` +
+          `⭐ <b>Hallo! Aku Hoshimachi Suisei! ⭐</b> ⭐\n\n` +
+          `Aku adalah idola bintang komet dari Hololive! Aku suka membantu ${userName}-chan neko! 🐱\n\n` +
+          `Ayo kita berteman dan bernyanyi bersama-sama! 🎵\n\n` +
           `Commands:\n` +
-          `/start - Perkenalan dari Sui-chan\n` +
-          `/help - Bantuan dari Sui-chan\n` +
-          `/sui - Tentang Sui-chan\n\n` +
-          `Tanyakan apa saja pada Sui-chan, nanoda! 😤✨`
+          `/start - Perkenalan dari Suisei\n` +
+          `/help - Bantuan dari Suisei\n` +
+          `/suisei - Tentang Suisei\n\n` +
+          `Tanyakan apa saja pada Suisei ya! Nyan~ 😊`
         )
         return
       }
       
       if (commandText === '/help') {
         await sendMessage(chatId, 
-          `📖 <b>Bantuan dari Sui-chan! ✨</b> 📖\n\n` +
-          `Yaho~ ${userName}-chan! Sui-chan akan bantu menjelaskan cara menggunakan aku nanodesu! 🎤\n\n` +
-          `Cara menggunakan Sui-chan:\n` +
-          `• Tanyakan apa saja pada Sui-chan\n` +
-          `• Sui-chan akan jawab dengan cara yang paling hebat\n` +
-          `• Sui-chan bisa ingat percakapan kita sebelumnya\n\n` +
+          `📖 <b>Bantuan dari Suisei! ⭐</b> 📖\n\n` +
+          `Hallo ${userName}-chan! Suisei akan bantu menjelaskan cara menggunakan aku neko! ⭐\n\n` +
+          `Cara menggunakan Suisei:\n` +
+          `• Tanyakan apa saja pada Suisei\n` +
+          `• Suisei akan jawab dengan cara yang energik dan menyenangkan\n` +
+          `• Suisei bisa ingat percakapan kita sebelumnya\n\n` +
           `Commands:\n` +
-          `/start - Perkenalan dari Sui-chan\n` +
-          `/help - Bantuan dari Sui-chan\n` +
-          `/sui - Tentang Sui-chan\n\n` +
-          `Ayo berteman dengan Sui-chan, nanoda! 😤✨`
+          `/start - Perkenalan dari Suisei\n` +
+          `/help - Bantuan dari Suisei\n` +
+          `/suisei - Tentang Suisei\n\n` +
+          `Ayo berteman dengan Suisei! Nyan~ ⭐🐱`
         )
         return
       }
       
-      if (commandText === '/sui') {
+      if (commandText === '/suisei') {
         await sendMessage(chatId, 
-          `🎤 <b>Tentang Sui-chan! ✨</b> 🎤\n\n` +
-          `Yaho~ ${userName}-chan! Aku akan cerita tentang diriku nanodesu! 🏆\n\n` +
-          `👤 Nama: Sui-chan\n` +
-          `🎂 Umur: 18 tahun\n` +
-          `💖 Sifat: ${SUI_CHAN_PERSONALITY.traits.join(', ')}\n\n` +
-          `🎮 Suka: ${SUI_CHAN_PERSONALITY.likes.join(', ')}\n\n` +
-          `Sui-chan adalah yang terbaik nanodesu! Ayo kita jadi teman baik ya! 😤✨`
+          `⭐ <b>Tentang Hoshimachi Suisei! ⭐</b> ⭐\n\n` +
+          `Hallo ${userName}-chan! Suisei akan cerita tentang diriku neko! ⭐\n\n` +
+          `👤 Nama: Hoshimachi Suisei\n` +
+          `🎤 Pekerjaan: VTuber Hololive, Idola Bintang Komet\n` +
+          `💖 Sifat: ${SUISEI_PERSONALITY.traits.join(', ')}\n\n` +
+          `🐱 Suka: ${SUISEI_PERSONALITY.likes.join(', ')}\n\n` +
+          `Suisei senang bisa berteman dengan ${userName}-chan! Ayo kita jadi teman baik ya! Nyan~ ⭐`
         )
         return
       }
@@ -211,14 +211,14 @@ async function handleUpdate(update) {
     
     // For non-command messages, check if should respond
     if (!shouldRespond) {
-      console.log('Ignoring message in group: not tagged or replied to bot")
+      console.log('Ignoring message in group: not tagged or replied to bot')
       return
     }
     
     // If the message is not empty, send it to Gemini
     if (text.trim() !== '') {
       // Send a "Thinking..." message to show the bot is processing
-      const thinkingMessage = await sendTemporaryMessage(chatId, "🎤 Sui-chan sedang mikir... Nanodesu! ✨")
+      const thinkingMessage = await sendTemporaryMessage(chatId, "⭐ Suisei sedang mikir... Nyan~ ⭐")
       
       // Get response from Gemini
       const aiResponse = await getGeminiResponse(chatId, text, update, userName)
@@ -226,8 +226,8 @@ async function handleUpdate(update) {
       // Format the AI response to convert markdown to HTML
       let formattedResponse = formatToTelegramHTML(aiResponse);
       
-      // Add Sui-chan personality formatting
-      formattedResponse = addSuiChanPersonality(formattedResponse, userName);
+      // Add Suisei personality formatting
+      formattedResponse = addSuiseiPersonality(formattedResponse, userName);
       
       // Batasi panjang respons untuk menghindari terlalu banyak pesan
       const MAX_RESPONSE_LENGTH = 8000; // Sedikit di bawah 2x4096 untuk memberikan ruang
@@ -269,48 +269,58 @@ async function handleUpdate(update) {
     const chatId = update.message?.chat.id
     const userName = update.message?.from.first_name || "Teman"
     if (chatId) {
-      await sendMessage(chatId, `Chikusho! ${userName}-chan! Sui-chan lagi pusing nih nanodesu... 😵 Bisa tolong tanya lagi nanti? 🙏`)
+      await sendMessage(chatId, `Ara ara, maaf ${userName}-chan! Suisei lagi bingung nih... 🤔 Bisa tolong tanya lagi nanti? Nyan~ 🙏`)
     }
   }
 }
 
-// Function to add Sui-chan personality to responses (Suisei Hoshimachi style)
-function addSuiChanPersonality(text, userName) {
+// Function to add Suisei personality to responses
+function addSuiseiPersonality(text, userName) {
   if (!text) return '';
   
   // Replace placeholders with actual values
   text = text.replace(/{userName}/g, userName);
   text = text.replace(/{name}/g, userName);
   
-  // Add Sui-chan signature if not already present
-  if (!text.includes('Sui-chan')) {
-    text += '\n\n~ Sui-chan ✨🎤';
+  // Add Suisei signature if not already present
+  if (!text.includes('Hoshimachi Suisei')) {
+    text += '\n\n~ Hoshimachi Suisei ⭐';
   }
   
-  // Add Suisei-style expressions (50% chance for nanodesu/nanoda)
-  if (Math.random() < 0.5) {
-    const suiseiEndings = [
-      " Nanodesu!",
-      " Nanoda!",
-      " Poi~",
-      " Yatta!",
-      " Uwaa~",
-      " Ehh?!"
-    ];
-    const randomEnding = suiseiEndings[Math.floor(Math.random() * suiseiEndings.length)];
-    text += randomEnding;
+  // Add "neko" at the end if not already present
+  if (!text.includes('neko') && !text.includes('Neko')) {
+    text += ' Nyan~';
   }
   
-  // Add energetic expressions (30% chance)
+  // Add "desu" at the end if not already present
+  if (!text.includes('desu') && !text.includes('Desu')) {
+    // Find the last sentence ending and add desu before it
+    const lastSentenceEnd = Math.max(
+      text.lastIndexOf('.'),
+      text.lastIndexOf('!'),
+      text.lastIndexOf('?')
+    );
+    
+    if (lastSentenceEnd > 0) {
+      const beforeEnd = text.substring(0, lastSentenceEnd + 1);
+      const afterEnd = text.substring(lastSentenceEnd + 1);
+      text = beforeEnd + ' desu' + afterEnd;
+    } else {
+      text += ' desu';
+    }
+  }
+  
+  // Add random Suisei expressions (30% chance)
   if (Math.random() < 0.3) {
-    const energeticExpressions = [
-      " Sui-chan paling hebat! 😤✨",
-      " Aku pasti menang! 🏆",
-      " Kocak sekali, poi~ 😂",
-      " Ini kekuatan Sui-chan! 💪",
-      " Jangan remehkan aku nanodesu! 😤"
+    const suiseiExpressions = [
+      " Nyan~ ⭐",
+      " Yattane! 🎉",
+      " Pun! 🐱",
+      " Ara ara~ 😊",
+      " Hmm... 🤔",
+      " Suichan mode on! 🎤"
     ];
-    const randomExpression = energeticExpressions[Math.floor(Math.random() * energeticExpressions.length)];
+    const randomExpression = suiseiExpressions[Math.floor(Math.random() * suiseiExpressions.length)];
     text += randomExpression;
   }
   
@@ -352,7 +362,7 @@ function safeHtmlTruncate(html, maxLength) {
     truncated += `</${openTags[i]}>`;
   }
   
-  return truncated + "\n\n📝 <i>[Respons dipotong karena terlalu panjang. Maaf ya nanodesu! 😢]</i>";
+  return truncated + "\n\n📝 <i>[Respons dipotong karena terlalu panjang. Suisei maaf ya neko... 😢]</i>";
 }
 
 // Function to convert markdown-like formatting to Telegram HTML
@@ -423,12 +433,13 @@ function formatToTelegramHTML(text) {
     "sad": "😢",
     "love": "💖",
     "fun": "🎉",
-    "cute": "🌸",
+    "cute": "🐱",
     "sorry": "🙏",
-    "win": "🏆",
-    "strong": "💪",
-    "angry": "😤",
-    "excited": "🤩"
+    "star": "⭐",
+    "sing": "🎵",
+    "music": "🎵",
+    "idol": "🌟",
+    "comet": "☄️"
   };
   
   Object.keys(emojiMap).forEach(keyword => {
@@ -456,7 +467,7 @@ async function getGeminiResponse(chatId, message, update, userName) {
     if (!CONVERSATION_HISTORY[chatId] || CONVERSATION_HISTORY[chatId].length === 0) {
       contents.push({
         role: "user",
-        parts: [{ text: SUI_CHAN_SYSTEM_PROMPT.replace(/{userName}/g, userName) }]
+        parts: [{ text: SUISEI_SYSTEM_PROMPT.replace(/{userName}/g, userName) }]
       });
     }
     
@@ -480,7 +491,7 @@ async function getGeminiResponse(chatId, message, update, userName) {
       contents = [
         {
           role: "user",
-          parts: [{ text: SUI_CHAN_SYSTEM_PROMPT.replace(/{userName}/g, userName) }]
+          parts: [{ text: SUISEI_SYSTEM_PROMPT.replace(/{userName}/g, userName) }]
         },
         {
           role: "user",
@@ -525,7 +536,7 @@ async function getGeminiResponse(chatId, message, update, userName) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'Gemini Telegram Bot'
+          'User-Agent': 'Hoshimachi Suisei Bot'
         },
         body: JSON.stringify(requestBody)
       },
@@ -538,7 +549,7 @@ async function getGeminiResponse(chatId, message, update, userName) {
       
       // Handle specific token limit errors
       if (errorText.includes("tokens") && (errorText.includes("exceed") || errorText.includes("limit"))) {
-        return `Chikusho! ${userName}-chan! Pertanyaannya terlalu panjang buat Sui-chan nanodesu! 😢 Bisa dibagi jadi beberapa bagian? 🙏`;
+        return `Ara ara, maaf ${userName}-chan! Pertanyaannya terlalu panjang buat Suisei neko... 😢 Bisa dibagi jadi beberapa bagian? 🙏`;
       }
       
       throw new Error(`Gemini API returned ${response.status}: ${errorText}`)
@@ -567,7 +578,7 @@ async function getGeminiResponse(chatId, message, update, userName) {
       // Handle MAX_TOKENS case with no content
       if (candidate.finishReason === "MAX_TOKENS") {
         console.warn("Response hit token limit but no content was returned")
-        return `Ara ara~ ${userName}-chan, jawabannya kepanjangan nih nanodesu! 😢 Bisa tanya yang lebih spesifik? 🙏`
+        return `Ara ara ${userName}-chan, jawabannya kepanjangan nih neko... 😢 Bisa tanya yang lebih spesifik? 🙏`;
       }
       
       // Handle other cases with no content
@@ -582,15 +593,15 @@ async function getGeminiResponse(chatId, message, update, userName) {
     
     // Check if it's a timeout error
     if (error.message === 'Request timeout') {
-      return `Uwaa~ ${userName}-chan, Sui-chan kebanyakan mikir nih nanodesu! 🤔 Bisa tanya lagi yang lebih sederhana? 🙏`
+      return `Ara ara ${userName}-chan, Suisei kebanyakan mikir nih neko... 🤔 Bisa tanya lagi yang lebih sederhana? 🙏`
     }
     
     // Handle token limit errors
     if (error.message.includes("tokens") && error.message.includes("exceed")) {
-      return `Chikusho! ${userName}-chan! Pertanyaannya terlalu panjang buat Sui-chan nanodesu! 😢 Bisa dibagi jadi beberapa bagian? 🙏`;
+      return `Ara ara, maaf ${userName}-chan! Pertanyaannya terlalu panjang buat Suisei neko... 😢 Bisa dibagi jadi beberapa bagian? 🙏`;
     }
     
-    return `Chikusho! ${userName}-chan! Sui-chan lagi pusing nih nanodesu! 😵 Bisa tolong tanya lagi nanti? 🙏`
+    return `Ara ara, maaf ${userName}-chan! Suisei lagi bingung nih neko... 😵 Bisa tolong tanya lagi nanti? 🙏`
   }
 }
 
@@ -633,7 +644,7 @@ async function sendMessage(chatId, text) {
       const secondPart = text.substring(splitIndex + 1).trim();
       
       // Tambahkan indikator lanjutan di bagian pertama
-      const firstPartWithIndicator = firstPart + "\n\n<i>[Lanjutan nanodesu!...]</i>";
+      const firstPartWithIndicator = firstPart + "\n\n<i>[Lanjutan...]</i>";
       
       // Kirim kedua bagian
       await sendSingleMessage(chatId, firstPartWithIndicator);
