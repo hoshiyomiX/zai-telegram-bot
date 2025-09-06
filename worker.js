@@ -7,7 +7,7 @@ const CONFIG = {
     age: "8 tahun",
     traits: ["ceria", "imajinatif", "penasaran", "ramah", "sedikit ceroboh"],
     likes: ["permen", "mainan", "menggambar", "mendengar cerita", "bertemu teman baru"],
-    emoji: ["😊", "✨", "🌸", "🍭", "🎀", "🤔", "🙏", "😢", "🎉"]
+    emoji: ["😊", "✨", "🌸", "🍭", "🎀", "🤔", "🙏", "😢", "🎉", "💖"]
   },
   rateLimit: {
     duration: 60000, // 1 menit
@@ -46,7 +46,7 @@ Gaya bicara ${CONFIG.bot.name}:
 - Menggunakan emoji ${CONFIG.bot.emoji.join(', ')}
 - Menambahkan "-chan" pada nama pengguna (misal: "${userName}-chan")
 - Menggunakan kata-kata imut seperti "nggak", "iya", "yuk", "dong"
-- Kadang menggunakan onomatope seperti "nyaa~", "uwaa~", "kyaa~"
+- Selalu gunakan ✨ sebagai tanda signature di akhir pesan
 
 Kata-kata favorit ${CONFIG.bot.name}:
 - "${CONFIG.bot.name} akan membantu ${userName}-chan!"
@@ -69,13 +69,13 @@ Contoh jawaban ${CONFIG.bot.name}:
 
 Sekarang, jawab pertanyaan berikut dengan gaya ${CONFIG.bot.name}:`,
 
-  expressions: [
-    " Nyaa~ 😊",
-    " Uwaa~ ✨",
-    " Hehe~ 🍭",
-    " Yatta! 🎉",
-    " Hmm... 🤔",
-    " Oke oke! 👍"
+  // Ganti suara neko dengan sparkle signature
+  sparkles: [
+    " ✨",
+    " ✨✨",
+    " ✨🌸",
+    " 🌸✨",
+    " 💖✨"
   ],
 
   greetings: {
@@ -158,7 +158,7 @@ async function handleUpdate(update) {
       return;
     }
     
-    const { chatId, text, chatType, userId, userName } = extractMessageInfo(update);
+    const { chatId, text, chatType, userId, userName, userUsername } = extractMessageInfo(update);
     console.log(`Message from ${chatId}: ${text}`);
     
     // Rate limiting check
@@ -180,7 +180,7 @@ async function handleUpdate(update) {
     
     // Process regular message
     if (text.trim() !== '') {
-      await processRegularMessage(chatId, text, update, userName);
+      await processRegularMessage(chatId, text, update, userName, userId, userUsername);
     }
   } catch (error) {
     console.error('Error processing update:', error);
@@ -202,7 +202,8 @@ function extractMessageInfo(update) {
     text: message.text || '',
     chatType: message.chat.type,
     userId: message.from.id,
-    userName: message.from.first_name || "Teman"
+    userName: message.from.first_name || "Teman",
+    userUsername: message.from.username || null
   };
 }
 
@@ -271,13 +272,13 @@ async function handleCommands(chatId, text, userName) {
   }
 }
 
-async function processRegularMessage(chatId, text, update, userName) {
+async function processRegularMessage(chatId, text, update, userName, userId, userUsername) {
   const thinkingMessage = await sendTemporaryMessage(chatId, `🌸 ${CONFIG.bot.name} sedang mikir... ✨`);
   
   try {
     const aiResponse = await getGeminiResponse(chatId, text, update, userName);
     const formattedResponse = formatToTelegramHTML(aiResponse);
-    const personalityResponse = addPersonality(formattedResponse, userName);
+    const personalityResponse = addPersonality(formattedResponse, userName, userId, userUsername);
     
     // Truncate if too long
     const finalResponse = personalityResponse.length > CONFIG.response.maxLength 
@@ -309,20 +310,58 @@ function replacePlaceholders(text, userName) {
   return text.replace(/{userName}/g, userName).replace(/{name}/g, userName);
 }
 
-function addPersonality(text, userName) {
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function createUserLink(userId, displayText) {
+  return `<a href="tg://user?id=${userId}">${displayText}</a>`;
+}
+
+function addPersonality(text, userName, userId, userUsername) {
   if (!text) return '';
   
   text = replacePlaceholders(text, userName);
+  
+  // Create user links for mentions
+  if (userId) {
+    // Replace variations of the user's name
+    const nameVariations = [
+      userName,
+      `${userName}-chan`,
+      userName.toLowerCase(),
+      `${userName.toLowerCase()}-chan`
+    ];
+    
+    // Replace each variation with the link
+    for (const variation of nameVariations) {
+      const regex = new RegExp(`\\b${escapeRegExp(variation)}\\b`, 'gi');
+      text = text.replace(regex, createUserLink(userId, variation));
+    }
+    
+    // If user has a username, replace username variations
+    if (userUsername) {
+      const usernameVariations = [
+        `@${userUsername}`,
+        userUsername
+      ];
+      
+      for (const variation of usernameVariations) {
+        const regex = new RegExp(`\\b${escapeRegExp(variation)}\\b`, 'gi');
+        text = text.replace(regex, createUserLink(userId, variation));
+      }
+    }
+  }
   
   // Add signature if not present
   if (!text.includes(CONFIG.bot.name)) {
     text += `\n\n~ ${CONFIG.bot.name} ✨🌸`;
   }
   
-  // Add random expression (30% chance)
+  // Add random sparkle (30% chance) instead of cat sounds
   if (Math.random() < 0.3) {
-    const randomExpression = PERSONALITY.expressions[Math.floor(Math.random() * PERSONALITY.expressions.length)];
-    text += randomExpression;
+    const randomSparkle = PERSONALITY.sparkles[Math.floor(Math.random() * PERSONALITY.sparkles.length)];
+    text += randomSparkle;
   }
   
   return text;
@@ -474,11 +513,18 @@ function formatToTelegramHTML(text) {
     }
   );
   
-  // Text formatting
+  // Text formatting - Fixed order to avoid conflicts
+  // Bold (high priority)
   formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+  
+  // Italic
   formatted = formatted.replace(/\*([^*]+)\*/g, '<i>$1</i>');
+  
+  // Underline
   formatted = formatted.replace(/__([^_]+)__/g, '<u>$1</u>');
-  formatted = formatted.replace(/~([^~]+)~/g, '<s>$1</s>');
+  
+  // Strikethrough with stricter rules (only double tildes)
+  formatted = formatted.replace(/~~([^~\s]+)~~/g, '<s>$1</s>');
   
   // Headers
   formatted = formatted.replace(/^### (.*$)/gm, '<b><i>$1</i></b>');
@@ -557,109 +603,4 @@ async function sendMessage(chatId, text) {
       text = safeHtmlTruncate(text, CONFIG.response.maxLength);
     }
     
-    // Split into chunks if needed
-    if (text.length > 4096) {
-      const midpoint = Math.floor(text.length / 2);
-      let splitIndex = text.lastIndexOf('. ', midpoint + 500);
-      if (splitIndex === -1) splitIndex = text.lastIndexOf('\n\n', midpoint + 500);
-      if (splitIndex === -1) splitIndex = text.lastIndexOf(' ', midpoint + 500);
-      if (splitIndex === -1) splitIndex = 4096;
-      
-      const firstPart = text.substring(0, splitIndex + 1);
-      const secondPart = text.substring(splitIndex + 1).trim();
-      
-      await sendSingleMessage(chatId, firstPart + "\n\n<i>[Lanjutan...]</i>");
-      await sendSingleMessage(chatId, secondPart);
-    } else {
-      await sendSingleMessage(chatId, text);
-    }
-  } catch (error) {
-    console.error('Error in sendMessage:', error);
-  }
-}
-
-async function sendSingleMessage(chatId, text) {
-  const token = TELEGRAM_BOT_TOKEN;
-  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: text,
-      parse_mode: 'HTML',
-      disable_web_page_preview: true
-    })
-  });
-  
-  if (!response.ok) {
-    console.error('Error sending message:', await response.text());
-  } else {
-    console.log('Message sent successfully');
-  }
-}
-
-async function sendTemporaryMessage(chatId, text) {
-  try {
-    const token = TELEGRAM_BOT_TOKEN;
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text,
-        parse_mode: 'HTML'
-      })
-    });
-    
-    if (!response.ok) {
-      console.error('Error sending temporary message:', await response.text());
-      return null;
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error in sendTemporaryMessage:', error);
-    return null;
-  }
-}
-
-async function deleteMessage(chatId, messageId) {
-  try {
-    const token = TELEGRAM_BOT_TOKEN;
-    const response = await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        message_id: messageId
-      })
-    });
-    
-    if (!response.ok) {
-      console.error('Error deleting message:', await response.text());
-    }
-  } catch (error) {
-    console.error('Error in deleteMessage:', error);
-  }
-}
-
-// ======================
-// UTILITY FUNCTIONS
-// ======================
-function escapeHtml(text) {
-  if (!text) return '';
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-function fetchWithTimeout(url, options, timeout = 10000) {
-  console.log(`Fetching ${url} with timeout ${timeout}ms`);
-  return Promise.race([
-    fetch(url, options),
-    new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Request timeout')), timeout)
-    )
-  ]);
-}
+   
