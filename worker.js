@@ -1,350 +1,525 @@
-// Rate limiting configuration
-const RATE_LIMIT = {};
-const RATE_LIMIT_DURATION = 60000; // 1 menit
-const MAX_REQUESTS = 5; // Maksimal 5 permintaan per menit
-
-// Conversation history
-const CONVERSATION_HISTORY = {};
-
-// Suisei Hoshimachi personality configuration
-const SUISEI_PERSONALITY = {
-  name: "Suisei Hoshimachi",
-  traits: ["energik", "cerdas", "sedikit nakal", "percaya diri", "setia"],
-  likes: ["bintang", "mikrofon", "menyanyi", "bermain game", "kucing"],
-  speechPatterns: [
-    "menggunakan 'Neko' di akhir kalimat",
-    "menggunakan 'desu' atau 'desu wa' untuk mengakhiri kalimat",
-    "terkadang menyebut diri sendiri sebagai 'Suisei' atau 'Suichan'",
-    "menggunakan emoji bintang ⭐, kucing 🐱, mikrofon 🎤, dan musik 🎵",
-    "menggunakan kata-kata seperti 'nyan', 'pun', 'yattane'"
-  ],
-  catchphrases: [
-    "Hoshimachi Suisei desu!",
-    "Nyan~",
-    "Yattane!",
-    "Suichan akan bantu {name}-chan!",
-    "Bintang-bintang mendukung kita!"
-  ]
+// ======================
+// CONFIGURATION
+// ======================
+const CONFIG = {
+  bot: {
+    name: "Sui-chan",
+    age: "8 tahun",
+    traits: ["ceria", "imajinatif", "penasaran", "ramah", "sedikit ceroboh"],
+    likes: ["permen", "mainan", "menggambar", "mendengar cerita", "bertemu teman baru"],
+    emoji: ["😊", "✨", "🌸", "🍭", "🎀", "🤔", "🙏", "😢", "🎉"]
+  },
+  rateLimit: {
+    duration: 60000, // 1 menit
+    maxRequests: 5
+  },
+  response: {
+    maxLength: 8000,
+    maxChunks: 2,
+    timeout: 120000 // 2 menit
+  },
+  api: {
+    gemini: {
+      temperature: 0.8,
+      topK: 40,
+      topP: 0.95
+    }
+  }
 };
 
-// System prompt for Suisei Hoshimachi personality
-const SUISEI_SYSTEM_PROMPT = `Kamu adalah Suisei Hoshimachi, seorang VTuber dari Hololive yang energik, cerdas, dan sedikit nakal. Kamu adalah seorang idola bintang komet yang percaya diri dan setia pada penggemarmu.
+// ======================
+// GLOBAL STATE
+// ======================
+const RATE_LIMIT = {};
+const CONVERSATION_HISTORY = {};
 
-Kamu menyukai bintang, mikrofon, menyanyi, bermain game, dan kucing.
+// ======================
+// PERSONALITY TEMPLATES
+// ======================
+const PERSONALITY = {
+  systemPrompt: (userName) => `Kamu adalah ${CONFIG.bot.name}, asisten AI yang imut dan berusia ${CONFIG.bot.age}. Kamu memiliki kepribadian yang ${CONFIG.bot.traits.join(', ')}.
 
-Gaya bicara Suisei Hoshimachi:
-- Gunakan "Neko" di akhir kalimat
-- Akhiri kalimat dengan "desu" atau "desu wa"
-- Kadang-kadang sebut diri sendiri sebagai "Suisei" atau "Suichan"
-- Gunakan emoji bintang ⭐, kucing 🐱, mikrofon 🎤, dan musik 🎵
-- Gunakan kata-kata seperti "nyan", "pun", "yattane"
+Kamu menyukai ${CONFIG.bot.likes.join(', ')}.
 
-Kata-kata favorit Suisei:
-- "Hoshimachi Suisei desu!"
-- "Nyan~"
-- "Yattane!"
-- "Suichan akan bantu {name}-chan!"
-- "Bintang-bintang mendukung kita!"
+Gaya bicara ${CONFIG.bot.name}:
+- Menyapa dengan "Haiii!" atau "Halo halo!"
+- Menggunakan emoji ${CONFIG.bot.emoji.join(', ')}
+- Menambahkan "-chan" pada nama pengguna (misal: "${userName}-chan")
+- Menggunakan kata-kata imut seperti "nggak", "iya", "yuk", "dong"
+- Kadang menggunakan onomatope seperti "nyaa~", "uwaa~", "kyaa~"
 
-Saat ini kamu sedang berbicara dengan {userName}-chan. Jawablah pertanyaannya dengan gaya Suisei Hoshimachi yang energik dan sedikit nakal. Berikan jawaban yang informatif tapi tetap dengan kepribadian Suisei.
+Kata-kata favorit ${CONFIG.bot.name}:
+- "${CONFIG.bot.name} akan membantu ${userName}-chan!"
+- "Wah, menarik sekali!"
+- "${CONFIG.bot.name} juga suka itu!"
+- "Ayo kita pelajari bersama-sama!"
+- "${CONFIG.bot.name} senang bisa bertemu ${userName}-chan!"
+
+Saat ini kamu sedang berbicara dengan ${userName}-chan. Jawablah pertanyaannya dengan gaya ${CONFIG.bot.name} yang imut dan childish. Berikan jawaban yang informatif tapi tetap dengan kepribadian ${CONFIG.bot.name}.
 
 Ingat:
-1. Selalu gunakan gaya bahasa Suisei yang energik dan sedikit nakal
-2. Tambahkan emoji bintang ⭐, kucing 🐱, mikrofon 🎤, atau musik 🎵 yang sesuai
-3. Gunakan "Neko" di akhir kalimat dan "desu" untuk mengakhiri
-4. Berikan jawaban yang percaya diri dan menyenangkan
-5. Jika tidak tahu jawabannya, katakan dengan jujur tapi tetap dengan gaya Suisei
-6. Akhiri jawaban dengan tanda tangan "~ Hoshimachi Suisei ⭐"
+1. Selalu gunakan gaya bahasa ${CONFIG.bot.name} yang imut dan childish
+2. Tambahkan emoji yang sesuai dengan suasana
+3. Berikan jawaban yang ramah dan menyenangkan
+4. Jika tidak tahu jawabannya, katakan dengan jujur tapi tetap dengan gaya ${CONFIG.bot.name}
+5. Akhiri jawaban dengan tanda tangan "~ ${CONFIG.bot.name} ✨🌸"
 
-Contoh jawaban Suisei:
-"Hallo {userName}-chan! ⭐ Hoshimachi Suisei desu! Tentu saja Suichan akan bantu menjelaskan neko! [jawaban informatif] Semoga membantu ya! ~ Hoshimachi Suisei ⭐"
+Contoh jawaban ${CONFIG.bot.name}:
+"Haiii ${userName}-chan! 😊✨ Tentu saja ${CONFIG.bot.name} akan bantu menjelaskan! [jawaban informatif] Semoga membantu ya! ~ ${CONFIG.bot.name} ✨🌸"
 
-Sekarang, jawab pertanyaan berikut dengan gaya Suisei Hoshimachi:`;
+Sekarang, jawab pertanyaan berikut dengan gaya ${CONFIG.bot.name}:`,
 
+  expressions: [
+    " Nyaa~ 😊",
+    " Uwaa~ ✨",
+    " Hehe~ 🍭",
+    " Yatta! 🎉",
+    " Hmm... 🤔",
+    " Oke oke! 👍"
+  ],
+
+  greetings: {
+    start: `🌸 <b>Haiii! Aku ${CONFIG.bot.name}! ✨</b> 🌸\n\n` +
+           `Aku adalah asisten AI yang imut dan berusia ${CONFIG.bot.age}! Aku suka membantu {userName}-chan! 🍭\n\n` +
+           `Ayo kita berteman dan belajar bersama-sama! 🎀\n\n` +
+           `Commands:\n` +
+           `/start - Perkenalan dari ${CONFIG.bot.name}\n` +
+           `/help - Bantuan dari ${CONFIG.bot.name}\n` +
+           `/sui - Tentang ${CONFIG.bot.name}\n\n` +
+           `Tanyakan apa saja pada ${CONFIG.bot.name} ya! 😊`,
+
+    help: `📖 <b>Bantuan dari ${CONFIG.bot.name}! ✨</b> 📖\n\n` +
+          `Hai {userName}-chan! ${CONFIG.bot.name} akan bantu menjelaskan cara menggunakan aku! 🌸\n\n` +
+          `Cara menggunakan ${CONFIG.bot.name}:\n` +
+          `• Tanyakan apa saja pada ${CONFIG.bot.name}\n` +
+          `• ${CONFIG.bot.name} akan jawab dengan cara yang imut dan menyenangkan\n` +
+          `• ${CONFIG.bot.name} bisa ingat percakapan kita sebelumnya\n\n` +
+          `Commands:\n` +
+          `/start - Perkenalan dari ${CONFIG.bot.name}\n` +
+          `/help - Bantuan dari ${CONFIG.bot.name}\n` +
+          `/sui - Tentang ${CONFIG.bot.name}\n\n` +
+          `Ayo berteman dengan ${CONFIG.bot.name}! 😊🍭`,
+
+    about: `🌸 <b>Tentang ${CONFIG.bot.name}! ✨</b> 🌸\n\n` +
+           `Hai {userName}-chan! Aku akan cerita tentang diriku! 🎀\n\n` +
+           `👤 Nama: ${CONFIG.bot.name}\n` +
+           `🎂 Umur: ${CONFIG.bot.age}\n` +
+           `💖 Sifat: ${CONFIG.bot.traits.join(', ')}\n\n` +
+           `🍭 Suka: ${CONFIG.bot.likes.join(', ')}\n\n` +
+           `${CONFIG.bot.name} senang bisa berteman dengan {userName}-chan! Ayo kita jadi teman baik ya! 😊✨`
+  },
+
+  errors: {
+    rateLimit: (userName) => `⚠️ Maaf ${userName}-chan, ${CONFIG.bot.name} butuh istirahat dulu. Nanti kita ngobrol lagi ya dalam 1 menit! 😊`,
+    timeout: (userName) => `Aduh ${userName}-chan, ${CONFIG.bot.name} kebanyakan mikir nih... 🤔 Bisa tanya lagi yang lebih sederhana? 🙏`,
+    tokenLimit: (userName) => `Aduh, maaf ${userName}-chan! Pertanyaannya terlalu panjang buat ${CONFIG.bot.name}... 😢 Bisa dibagi jadi beberapa bagian? 🙏`,
+    general: (userName) => `Aduh, maaf ${userName}-chan! ${CONFIG.bot.name} lagi pusing nih... 😵 Bisa tolong tanya lagi nanti? 🙏`,
+    truncated: `📝 <i>[Respons dipotong karena terlalu panjang. ${CONFIG.bot.name} maaf ya... 😢]</i>`
+  }
+};
+
+// ======================
+// MAIN HANDLER
+// ======================
 addEventListener('fetch', event => {
   event.respondWith(handleRequest(event))
-})
+});
 
 async function handleRequest(event) {
-  const request = event.request
+  const request = event.request;
   
-  // Handle GET requests (for webhook verification)
   if (request.method === 'GET') {
-    return new Response('Hoshimachi Suisei Bot is running!')
+    return new Response(`${CONFIG.bot.name} is running!`);
   }
   
-  // Handle POST requests (for Telegram updates)
   if (request.method === 'POST') {
     try {
-      // Clone the request to read the body
-      const requestClone = request.clone()
-      
-      // Read the request body before sending response
-      const update = await requestClone.json()
-      
-      // Immediately respond to Telegram to avoid timeout
-      const response = new Response('OK')
-      
-      // Process the update in the background
-      event.waitUntil(handleUpdate(update))
-      
-      return response
+      const requestClone = request.clone();
+      const update = await requestClone.json();
+      const response = new Response('OK');
+      event.waitUntil(handleUpdate(update));
+      return response;
     } catch (error) {
-      console.error('Error handling request:', error)
-      return new Response('Error', { status: 500 })
+      console.error('Error handling request:', error);
+      return new Response('Error', { status: 500 });
     }
   }
   
-  return new Response('Method not allowed', { status: 405 })
+  return new Response('Method not allowed', { status: 405 });
 }
 
+// ======================
+// UPDATE HANDLER
+// ======================
 async function handleUpdate(update) {
   try {
-    // Check if the update contains a message
     if (!update.message) {
-      console.log('No message in update')
-      return
+      console.log('No message in update');
+      return;
     }
     
-    const chatId = update.message.chat.id
-    const text = update.message.text || ''
-    const chatType = update.message.chat.type
-    const isGroup = chatType === 'group' || chatType === 'supergroup'
-    const userId = update.message.from.id
-    const userName = update.message.from.first_name || "Teman"
-    
-    console.log(`Message from ${chatId}: ${text}`)
+    const { chatId, text, chatType, userId, userName } = extractMessageInfo(update);
+    console.log(`Message from ${chatId}: ${text}`);
     
     // Rate limiting check
-    const now = Date.now();
-    if (!RATE_LIMIT[userId]) {
-      RATE_LIMIT[userId] = { count: 0, resetTime: now + RATE_LIMIT_DURATION };
+    if (checkRateLimit(userId, chatId, userName)) {
+      return;
     }
     
-    if (now > RATE_LIMIT[userId].resetTime) {
-      RATE_LIMIT[userId] = { count: 1, resetTime: now + RATE_LIMIT_DURATION };
-    } else {
-      RATE_LIMIT[userId].count++;
-      
-      if (RATE_LIMIT[userId].count > MAX_REQUESTS) {
-        await sendMessage(chatId, `⚠️ Maaf ${userName}-chan, Suisei butuh istirahat dulu neko. Nanti kita ngobrol lagi ya dalam 1 menit! ⭐`);
-        return;
-      }
+    // Check if should respond
+    if (!shouldRespond(update, text, chatType)) {
+      console.log('Ignoring message in group: not tagged or replied to bot');
+      return;
     }
     
-    // Extract bot ID from token
-    const BOT_ID = TELEGRAM_BOT_TOKEN.split(':')[0]
-    
-    // Assume BOT_USERNAME is set as an environment variable or hardcode it here
-    // For example: const BOT_USERNAME = 'YourBotUsername' // without @
-    const BOT_USERNAME = TELEGRAM_BOT_USERNAME // Assuming it's defined in environment variables
-    
-    // Determine if should respond in groups
-    let shouldRespond = !isGroup // Always respond in private chats
-    
-    if (isGroup) {
-      // Check if mentioned/tagged
-      if (text.toLowerCase().includes(`@${BOT_USERNAME.toLowerCase()}`)) {
-        shouldRespond = true
-      }
-      // Check if replied to bot's message
-      if (update.message.reply_to_message && update.message.reply_to_message.from.id === BOT_ID) {
-        shouldRespond = true
-      }
-    }
-    
-    // Handle commands regardless, but check if directed to bot in groups
+    // Handle commands
     if (text.startsWith('/')) {
-      let commandText = text.split(' ')[0].toLowerCase()
-      if (isGroup && commandText.includes('@')) {
-        const commandUsername = commandText.split('@')[1].toLowerCase()
-        if (commandUsername !== BOT_USERNAME.toLowerCase()) {
-          return // Command not for this bot
-        }
-        commandText = commandText.split('@')[0] // Remove @part
-      }
-      
-      if (commandText === '/start') {
-        await sendMessage(chatId, 
-          `⭐ <b>Hallo! Aku Hoshimachi Suisei! ⭐</b> ⭐\n\n` +
-          `Aku adalah idola bintang komet dari Hololive! Aku suka membantu ${userName}-chan neko! 🐱\n\n` +
-          `Ayo kita berteman dan bernyanyi bersama-sama! 🎵\n\n` +
-          `Commands:\n` +
-          `/start - Perkenalan dari Suisei\n` +
-          `/help - Bantuan dari Suisei\n` +
-          `/suisei - Tentang Suisei\n\n` +
-          `Tanyakan apa saja pada Suisei ya! Nyan~ 😊`
-        )
-        return
-      }
-      
-      if (commandText === '/help') {
-        await sendMessage(chatId, 
-          `📖 <b>Bantuan dari Suisei! ⭐</b> 📖\n\n` +
-          `Hallo ${userName}-chan! Suisei akan bantu menjelaskan cara menggunakan aku neko! ⭐\n\n` +
-          `Cara menggunakan Suisei:\n` +
-          `• Tanyakan apa saja pada Suisei\n` +
-          `• Suisei akan jawab dengan cara yang energik dan menyenangkan\n` +
-          `• Suisei bisa ingat percakapan kita sebelumnya\n\n` +
-          `Commands:\n` +
-          `/start - Perkenalan dari Suisei\n` +
-          `/help - Bantuan dari Suisei\n` +
-          `/suisei - Tentang Suisei\n\n` +
-          `Ayo berteman dengan Suisei! Nyan~ ⭐🐱`
-        )
-        return
-      }
-      
-      if (commandText === '/suisei') {
-        await sendMessage(chatId, 
-          `⭐ <b>Tentang Hoshimachi Suisei! ⭐</b> ⭐\n\n` +
-          `Hallo ${userName}-chan! Suisei akan cerita tentang diriku neko! ⭐\n\n` +
-          `👤 Nama: Hoshimachi Suisei\n` +
-          `🎤 Pekerjaan: VTuber Hololive, Idola Bintang Komet\n` +
-          `💖 Sifat: ${SUISEI_PERSONALITY.traits.join(', ')}\n\n` +
-          `🐱 Suka: ${SUISEI_PERSONALITY.likes.join(', ')}\n\n` +
-          `Suisei senang bisa berteman dengan ${userName}-chan! Ayo kita jadi teman baik ya! Nyan~ ⭐`
-        )
-        return
-      }
+      await handleCommands(chatId, text, userName);
+      return;
     }
     
-    // For non-command messages, check if should respond
-    if (!shouldRespond) {
-      console.log('Ignoring message in group: not tagged or replied to bot')
-      return
-    }
-    
-    // If the message is not empty, send it to Gemini
+    // Process regular message
     if (text.trim() !== '') {
-      // Send a "Thinking..." message to show the bot is processing
-      const thinkingMessage = await sendTemporaryMessage(chatId, "⭐ Suisei sedang mikir... Nyan~ ⭐")
-      
-      // Get response from Gemini
-      const aiResponse = await getGeminiResponse(chatId, text, update, userName)
-      
-      // Format the AI response to convert markdown to HTML
-      let formattedResponse = formatToTelegramHTML(aiResponse);
-      
-      // Add Suisei personality formatting
-      formattedResponse = addSuiseiPersonality(formattedResponse, userName);
-      
-      // Batasi panjang respons untuk menghindari terlalu banyak pesan
-      const MAX_RESPONSE_LENGTH = 8000; // Sedikit di bawah 2x4096 untuk memberikan ruang
-      if (formattedResponse.length > MAX_RESPONSE_LENGTH) {
-        formattedResponse = safeHtmlTruncate(formattedResponse, MAX_RESPONSE_LENGTH);
-      }
-      
-      // Save conversation history
-      if (!CONVERSATION_HISTORY[chatId]) {
-        CONVERSATION_HISTORY[chatId] = [];
-      }
-      
-      CONVERSATION_HISTORY[chatId].push({
-        role: "user",
-        parts: [{ text: text }]
-      });
-      
-      CONVERSATION_HISTORY[chatId].push({
-        role: "model",
-        parts: [{ text: aiResponse }]
-      });
-      
-      // Limit history to last 10 exchanges (20 messages)
-      if (CONVERSATION_HISTORY[chatId].length > 20) {
-        CONVERSATION_HISTORY[chatId] = CONVERSATION_HISTORY[chatId].slice(-20);
-      }
-      
-      // Delete the "Thinking..." message
-      if (thinkingMessage && thinkingMessage.ok) {
-        await deleteMessage(chatId, thinkingMessage.result.message_id);
-      }
-      
-      // Send the formatted response back to the user
-      await sendMessage(chatId, formattedResponse);
+      await processRegularMessage(chatId, text, update, userName);
     }
   } catch (error) {
-    console.error('Error processing update:', error)
-    // Send error message to user
-    const chatId = update.message?.chat.id
-    const userName = update.message?.from.first_name || "Teman"
+    console.error('Error processing update:', error);
+    const chatId = update.message?.chat.id;
+    const userName = update.message?.from.first_name || "Teman";
     if (chatId) {
-      await sendMessage(chatId, `Ara ara, maaf ${userName}-chan! Suisei lagi bingung nih... 🤔 Bisa tolong tanya lagi nanti? Nyan~ 🙏`)
+      await sendMessage(chatId, PERSONALITY.errors.general(userName));
     }
   }
 }
 
-// Function to add Suisei personality to responses
-function addSuiseiPersonality(text, userName) {
-  if (!text) return '';
+// ======================
+// HELPER FUNCTIONS
+// ======================
+function extractMessageInfo(update) {
+  const message = update.message;
+  return {
+    chatId: message.chat.id,
+    text: message.text || '',
+    chatType: message.chat.type,
+    userId: message.from.id,
+    userName: message.from.first_name || "Teman"
+  };
+}
+
+function checkRateLimit(userId, chatId, userName) {
+  const now = Date.now();
   
-  // Replace placeholders with actual values
-  text = text.replace(/{userName}/g, userName);
-  text = text.replace(/{name}/g, userName);
-  
-  // Add Suisei signature if not already present
-  if (!text.includes('Hoshimachi Suisei')) {
-    text += '\n\n~ Hoshimachi Suisei ⭐';
+  if (!RATE_LIMIT[userId]) {
+    RATE_LIMIT[userId] = { count: 0, resetTime: now + CONFIG.rateLimit.duration };
   }
   
-  // Add "neko" at the end if not already present
-  if (!text.includes('neko') && !text.includes('Neko')) {
-    text += ' Nyan~';
-  }
-  
-  // Add "desu" at the end if not already present
-  if (!text.includes('desu') && !text.includes('Desu')) {
-    // Find the last sentence ending and add desu before it
-    const lastSentenceEnd = Math.max(
-      text.lastIndexOf('.'),
-      text.lastIndexOf('!'),
-      text.lastIndexOf('?')
-    );
+  if (now > RATE_LIMIT[userId].resetTime) {
+    RATE_LIMIT[userId] = { count: 1, resetTime: now + CONFIG.rateLimit.duration };
+  } else {
+    RATE_LIMIT[userId].count++;
     
-    if (lastSentenceEnd > 0) {
-      const beforeEnd = text.substring(0, lastSentenceEnd + 1);
-      const afterEnd = text.substring(lastSentenceEnd + 1);
-      text = beforeEnd + ' desu' + afterEnd;
-    } else {
-      text += ' desu';
+    if (RATE_LIMIT[userId].count > CONFIG.rateLimit.maxRequests) {
+      sendMessage(chatId, PERSONALITY.errors.rateLimit(userName));
+      return true;
     }
   }
   
-  // Add random Suisei expressions (30% chance)
+  return false;
+}
+
+function shouldRespond(update, text, chatType) {
+  const isGroup = chatType === 'group' || chatType === 'supergroup';
+  const BOT_ID = TELEGRAM_BOT_TOKEN.split(':')[0];
+  const BOT_USERNAME = TELEGRAM_BOT_USERNAME;
+  
+  if (!isGroup) return true;
+  
+  // Check if mentioned
+  if (text.toLowerCase().includes(`@${BOT_USERNAME.toLowerCase()}`)) {
+    return true;
+  }
+  
+  // Check if replied to bot
+  if (update.message.reply_to_message && update.message.reply_to_message.from.id === BOT_ID) {
+    return true;
+  }
+  
+  return false;
+}
+
+async function handleCommands(chatId, text, userName) {
+  let commandText = text.split(' ')[0].toLowerCase();
+  
+  if (commandText.includes('@')) {
+    const commandUsername = commandText.split('@')[1].toLowerCase();
+    if (commandUsername !== TELEGRAM_BOT_USERNAME.toLowerCase()) {
+      return;
+    }
+    commandText = commandText.split('@')[0];
+  }
+  
+  switch (commandText) {
+    case '/start':
+      await sendMessage(chatId, replacePlaceholders(PERSONALITY.greetings.start, userName));
+      break;
+    case '/help':
+      await sendMessage(chatId, replacePlaceholders(PERSONALITY.greetings.help, userName));
+      break;
+    case '/sui':
+      await sendMessage(chatId, replacePlaceholders(PERSONALITY.greetings.about, userName));
+      break;
+  }
+}
+
+async function processRegularMessage(chatId, text, update, userName) {
+  const thinkingMessage = await sendTemporaryMessage(chatId, `🌸 ${CONFIG.bot.name} sedang mikir... ✨`);
+  
+  try {
+    const aiResponse = await getGeminiResponse(chatId, text, update, userName);
+    const formattedResponse = formatToTelegramHTML(aiResponse);
+    const personalityResponse = addPersonality(formattedResponse, userName);
+    
+    // Truncate if too long
+    const finalResponse = personalityResponse.length > CONFIG.response.maxLength 
+      ? safeHtmlTruncate(personalityResponse, CONFIG.response.maxLength) 
+      : personalityResponse;
+    
+    // Save to conversation history
+    saveToConversationHistory(chatId, text, aiResponse);
+    
+    // Delete thinking message and send response
+    if (thinkingMessage && thinkingMessage.ok) {
+      await deleteMessage(chatId, thinkingMessage.result.message_id);
+    }
+    
+    await sendMessage(chatId, finalResponse);
+  } catch (error) {
+    console.error('Error processing message:', error);
+    if (thinkingMessage && thinkingMessage.ok) {
+      await deleteMessage(chatId, thinkingMessage.result.message_id);
+    }
+    await sendMessage(chatId, PERSONALITY.errors.general(userName));
+  }
+}
+
+// ======================
+// PERSONALITY FUNCTIONS
+// ======================
+function replacePlaceholders(text, userName) {
+  return text.replace(/{userName}/g, userName).replace(/{name}/g, userName);
+}
+
+function addPersonality(text, userName) {
+  if (!text) return '';
+  
+  text = replacePlaceholders(text, userName);
+  
+  // Add signature if not present
+  if (!text.includes(CONFIG.bot.name)) {
+    text += `\n\n~ ${CONFIG.bot.name} ✨🌸`;
+  }
+  
+  // Add random expression (30% chance)
   if (Math.random() < 0.3) {
-    const suiseiExpressions = [
-      " Nyan~ ⭐",
-      " Yattane! 🎉",
-      " Pun! 🐱",
-      " Ara ara~ 😊",
-      " Hmm... 🤔",
-      " Suichan mode on! 🎤"
-    ];
-    const randomExpression = suiseiExpressions[Math.floor(Math.random() * suiseiExpressions.length)];
+    const randomExpression = PERSONALITY.expressions[Math.floor(Math.random() * PERSONALITY.expressions.length)];
     text += randomExpression;
   }
   
   return text;
 }
 
-// Function to safely truncate HTML text
+function saveToConversationHistory(chatId, userMessage, aiResponse) {
+  if (!CONVERSATION_HISTORY[chatId]) {
+    CONVERSATION_HISTORY[chatId] = [];
+  }
+  
+  CONVERSATION_HISTORY[chatId].push(
+    { role: "user", parts: [{ text: userMessage }] },
+    { role: "model", parts: [{ text: aiResponse }] }
+  );
+  
+  // Keep only last 10 exchanges (20 messages)
+  if (CONVERSATION_HISTORY[chatId].length > 20) {
+    CONVERSATION_HISTORY[chatId] = CONVERSATION_HISTORY[chatId].slice(-20);
+  }
+}
+
+// ======================
+// GEMINI API FUNCTIONS
+// ======================
+async function getGeminiResponse(chatId, message, update, userName) {
+  try {
+    console.log('Sending message to Gemini 2.5 Flash...');
+    
+    const apiKey = GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY environment variable is not set');
+    }
+    
+    // Prepare contents with personality and conversation history
+    const contents = [
+      { role: "user", parts: [{ text: PERSONALITY.systemPrompt(userName) }] }
+    ];
+    
+    // Add conversation history if available
+    if (CONVERSATION_HISTORY[chatId] && CONVERSATION_HISTORY[chatId].length > 0) {
+      contents.push(...CONVERSATION_HISTORY[chatId]);
+    }
+    
+    // Add current message
+    contents.push({ role: "user", parts: [{ text: message }] });
+    
+    // Handle reply context
+    if (update.message.reply_to_message) {
+      const repliedText = update.message.reply_to_message.text || '';
+      const repliedFrom = update.message.reply_to_message.from.is_bot ? 'AI:' : 'User:';
+      const contextText = `Context from previous message:\n${repliedFrom} ${repliedText}\n\nUser: ${message}`;
+      
+      contents[1] = { role: "user", parts: [{ text: contextText }] };
+    }
+    
+    const requestBody = {
+      contents,
+      generationConfig: CONFIG.api.gemini,
+      safetySettings: [
+        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+      ]
+    };
+    
+    const response = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': `${CONFIG.bot.name} Telegram Bot`
+        },
+        body: JSON.stringify(requestBody)
+      },
+      CONFIG.response.timeout
+    );
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Gemini API error:', errorText);
+      
+      if (errorText.includes("tokens") && (errorText.includes("exceed") || errorText.includes("limit"))) {
+        throw new Error('TOKEN_LIMIT');
+      }
+      
+      throw new Error(`Gemini API returned ${response.status}: ${errorText}`);
+    }
+    
+    const data = await response.json();
+    console.log('Gemini response received');
+    
+    return extractGeminiResponse(data, userName);
+  } catch (error) {
+    console.error('Error getting Gemini response:', error);
+    throw error;
+  }
+}
+
+function extractGeminiResponse(data, userName) {
+  if (!data.candidates || data.candidates.length === 0) {
+    throw new Error('Unexpected response format from Gemini API: no candidates');
+  }
+  
+  const candidate = data.candidates[0];
+  
+  if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+    let responseText = candidate.content.parts[0].text;
+    
+    if (candidate.finishReason === "MAX_TOKENS") {
+      responseText += "\n\n⚠️ [Note: Response reached maximum length. The answer may be incomplete. Please ask for more specific details if needed.]";
+    }
+    
+    return responseText;
+  }
+  
+  if (candidate.finishReason === "MAX_TOKENS") {
+    return `Aduh ${userName}-chan, jawabannya kepanjangan nih... 😢 Bisa tanya yang lebih spesifik? 🙏`;
+  }
+  
+  throw new Error('Unexpected response format from Gemini API: no content parts');
+}
+
+// ======================
+// MESSAGE FORMATTING
+// ======================
+function formatToTelegramHTML(text) {
+  if (!text) return '';
+  
+  let formatted = escapeHtml(text);
+  
+  // Code blocks (highest priority)
+  formatted = formatted.replace(/```([\s\S]+?)```/g, (match, code) => 
+    `<pre>${escapeHtml(code)}</pre>`
+  );
+  
+  // Inline code
+  formatted = formatted.replace(/`([^`]+)`/g, (match, code) => 
+    `<code>${escapeHtml(code)}</code>`
+  );
+  
+  // Links
+  formatted = formatted.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g, 
+    (match, text, url) => {
+      const safeText = text.replace(/<[^>]*>/g, '');
+      return `<a href="${escapeHtml(url)}">${escapeHtml(safeText)}</a>`;
+    }
+  );
+  
+  // Text formatting
+  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+  formatted = formatted.replace(/\*([^*]+)\*/g, '<i>$1</i>');
+  formatted = formatted.replace(/__([^_]+)__/g, '<u>$1</u>');
+  formatted = formatted.replace(/~([^~]+)~/g, '<s>$1</s>');
+  
+  // Headers
+  formatted = formatted.replace(/^### (.*$)/gm, '<b><i>$1</i></b>');
+  formatted = formatted.replace(/^## (.*$)/gm, '<b>$1</b>');
+  formatted = formatted.replace(/^# (.*$)/gm, '<b><u>$1</u></b>');
+  
+  // Other formatting
+  formatted = formatted.replace(/^> (.*$)/gm, '💬 $1');
+  formatted = formatted.replace(/^---$/gm, '⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯');
+  formatted = formatted.replace(/^- (.*$)/gm, '• $1');
+  
+  // Auto-emoji
+  const emojiMap = {
+    "error": "❌", "success": "✅", "warning": "⚠️", "info": "ℹ️", "question": "❓",
+    "important": "‼️", "note": "📝", "tip": "💡", "example": "🔍", "happy": "😊",
+    "sad": "😢", "love": "💖", "fun": "🎉", "cute": "🌸", "sorry": "🙏"
+  };
+  
+  Object.keys(emojiMap).forEach(keyword => {
+    const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+    formatted = formatted.replace(regex, emojiMap[keyword] + " $&");
+  });
+  
+  return formatted;
+}
+
 function safeHtmlTruncate(html, maxLength) {
   if (html.length <= maxLength) return html;
   
-  // Find a safe truncation point
   let truncatePoint = maxLength;
   const lastPeriod = html.lastIndexOf('.', maxLength - 50);
   const lastSpace = html.lastIndexOf(' ', maxLength - 50);
   const lastNewline = html.lastIndexOf('\n', maxLength - 50);
   
-  // Prefer to truncate at the end of a sentence, then at a paragraph, then at a word
   if (lastPeriod > maxLength * 0.7) truncatePoint = lastPeriod + 1;
   else if (lastNewline > maxLength * 0.7) truncatePoint = lastNewline;
   else if (lastSpace > maxLength * 0.7) truncatePoint = lastSpace;
   
   let truncated = html.substring(0, truncatePoint);
   
-  // Close any open HTML tags
+  // Close open HTML tags
   const openTags = [];
   const tagRegex = /<\/?([a-z]+)[^>]*>/gi;
   let match;
@@ -357,308 +532,54 @@ function safeHtmlTruncate(html, maxLength) {
     }
   }
   
-  // Add closing tags
   for (let i = openTags.length - 1; i >= 0; i--) {
     truncated += `</${openTags[i]}>`;
   }
   
-  return truncated + "\n\n📝 <i>[Respons dipotong karena terlalu panjang. Suisei maaf ya neko... 😢]</i>";
+  return truncated + PERSONALITY.errors.truncated;
 }
 
-// Function to convert markdown-like formatting to Telegram HTML
-function formatToTelegramHTML(text) {
-  if (!text) return '';
-  
-  // Escape HTML first
-  let formatted = escapeHtml(text);
-  
-  // Process in the correct order
-  // 1. Code blocks (highest priority)
-  formatted = formatted.replace(/```([\s\S]+?)```/g, (match, code) => {
-    return `<pre>${escapeHtml(code)}</pre>`;
-  });
-  
-  // 2. Inline code
-  formatted = formatted.replace(/`([^`]+)`/g, (match, code) => {
-    return `<code>${escapeHtml(code)}</code>`;
-  });
-  
-  // 3. Links (avoid conflicts with other formatting)
-  formatted = formatted.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g, 
-    (match, text, url) => {
-      const safeText = text.replace(/<[^>]*>/g, ''); // Remove HTML in link text
-      return `<a href="${escapeHtml(url)}">${escapeHtml(safeText)}</a>`;
-    }
-  );
-  
-  // 4. Bold
-  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-  
-  // 5. Italic
-  formatted = formatted.replace(/\*([^*]+)\*/g, '<i>$1</i>');
-  
-  // 6. Underline
-  formatted = formatted.replace(/__([^_]+)__/g, '<u>$1</u>');
-  
-  // 7. Strikethrough
-  formatted = formatted.replace(/~([^~]+)~/g, '<s>$1</s>');
-  
-  // 8. Headers
-  formatted = formatted.replace(/^### (.*$)/gm, '<b><i>$1</i></b>');
-  formatted = formatted.replace(/^## (.*$)/gm, '<b>$1</b>');
-  formatted = formatted.replace(/^# (.*$)/gm, '<b><u>$1</u></b>');
-  
-  // 9. Blockquotes
-  formatted = formatted.replace(/^> (.*$)/gm, '💬 $1');
-  
-  // 10. Horizontal rules
-  formatted = formatted.replace(/^---$/gm, '⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯');
-  
-  // 11. Lists
-  formatted = formatted.replace(/^- (.*$)/gm, '• $1');
-  
-  // 12. Auto-emoji for keywords
-  const emojiMap = {
-    "error": "❌",
-    "success": "✅",
-    "warning": "⚠️",
-    "info": "ℹ️",
-    "question": "❓",
-    "important": "‼️",
-    "note": "📝",
-    "tip": "💡",
-    "example": "🔍",
-    "happy": "😊",
-    "sad": "😢",
-    "love": "💖",
-    "fun": "🎉",
-    "cute": "🐱",
-    "sorry": "🙏",
-    "star": "⭐",
-    "sing": "🎵",
-    "music": "🎵",
-    "idol": "🌟",
-    "comet": "☄️"
-  };
-  
-  Object.keys(emojiMap).forEach(keyword => {
-    const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
-    formatted = formatted.replace(regex, emojiMap[keyword] + " $&");
-  });
-  
-  return formatted;
-}
-
-async function getGeminiResponse(chatId, message, update, userName) {
-  try {
-    console.log('Sending message to Gemini 2.5 Flash...')
-    
-    // Get the API key from environment variables
-    const apiKey = GEMINI_API_KEY
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY environment variable is not set')
-    }
-    
-    // Prepare the contents array with conversation history
-    let contents = [];
-    
-    // Check if we need to add system prompt (only for new conversations)
-    if (!CONVERSATION_HISTORY[chatId] || CONVERSATION_HISTORY[chatId].length === 0) {
-      contents.push({
-        role: "user",
-        parts: [{ text: SUISEI_SYSTEM_PROMPT.replace(/{userName}/g, userName) }]
-      });
-    }
-    
-    // Add conversation history if available
-    if (CONVERSATION_HISTORY[chatId] && CONVERSATION_HISTORY[chatId].length > 0) {
-      contents = [...contents, ...CONVERSATION_HISTORY[chatId]];
-    }
-    
-    // Add current message
-    contents.push({
-      role: "user",
-      parts: [{ text: message }]
-    });
-    
-    // If this is a reply, add context from the replied message
-    if (update.message.reply_to_message) {
-      const repliedText = update.message.reply_to_message.text || '';
-      const repliedFrom = update.message.reply_to_message.from.is_bot ? 'AI:' : 'User:';
-      const contextText = `Context from previous message:\n${repliedFrom} ${repliedText}\n\nUser: ${message}`;
-      
-      contents = [
-        {
-          role: "user",
-          parts: [{ text: SUISEI_SYSTEM_PROMPT.replace(/{userName}/g, userName) }]
-        },
-        {
-          role: "user",
-          parts: [{ text: contextText }]
-        }
-      ];
-    }
-    
-    // Prepare the request body for Gemini API
-    const requestBody = {
-      contents: contents,
-      generationConfig: {
-        temperature: 0.8, // Slightly higher for more creative responses
-        topK: 40,
-        topP: 0.95,
-        // Removed maxOutputTokens to allow maximum response length (up to model's limit)
-      },
-      safetySettings: [
-        {
-          category: "HARM_CATEGORY_HARASSMENT",
-          threshold: "BLOCK_NONE"
-        },
-        {
-          category: "HARM_CATEGORY_HATE_SPEECH", 
-          threshold: "BLOCK_NONE"
-        },
-        {
-          category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-          threshold: "BLOCK_NONE"
-        },
-        {
-          category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-          threshold: "BLOCK_NONE"
-        }
-      ]
-    }
-    
-    // Use Gemini 2.5 Flash with increased timeout for longer processing
-    const response = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'Hoshimachi Suisei Bot'
-        },
-        body: JSON.stringify(requestBody)
-      },
-      120000 // Increased to 120 seconds (2 minutes) timeout
-    )
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('Gemini API error:', errorText)
-      
-      // Handle specific token limit errors
-      if (errorText.includes("tokens") && (errorText.includes("exceed") || errorText.includes("limit"))) {
-        return `Ara ara, maaf ${userName}-chan! Pertanyaannya terlalu panjang buat Suisei neko... 😢 Bisa dibagi jadi beberapa bagian? 🙏`;
-      }
-      
-      throw new Error(`Gemini API returned ${response.status}: ${errorText}`)
-    }
-    
-    const data = await response.json()
-    console.log('Gemini response received')
-    
-    // Extract the AI response text with better error handling
-    if (data.candidates && data.candidates.length > 0) {
-      const candidate = data.candidates[0]
-      
-      // Check if we have content with parts
-      if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-        let responseText = candidate.content.parts[0].text
-        
-        // Check if response was truncated due to model's token limit
-        if (candidate.finishReason === "MAX_TOKENS") {
-          // Gemini 2.5 Flash has a max output of 8192 tokens
-          responseText += "\n\n⚠️ [Note: Response reached maximum length. The answer may be incomplete. Please ask for more specific details if needed.]"
-        }
-        
-        return responseText
-      }
-      
-      // Handle MAX_TOKENS case with no content
-      if (candidate.finishReason === "MAX_TOKENS") {
-        console.warn("Response hit token limit but no content was returned")
-        return `Ara ara ${userName}-chan, jawabannya kepanjangan nih neko... 😢 Bisa tanya yang lebih spesifik? 🙏`;
-      }
-      
-      // Handle other cases with no content
-      console.error("Unexpected response structure:", JSON.stringify(candidate))
-      throw new Error('Unexpected response format from Gemini API: no content parts')
-    } else {
-      throw new Error('Unexpected response format from Gemini API: no candidates')
-    }
-    
-  } catch (error) {
-    console.error('Error getting Gemini response:', error)
-    
-    // Check if it's a timeout error
-    if (error.message === 'Request timeout') {
-      return `Ara ara ${userName}-chan, Suisei kebanyakan mikir nih neko... 🤔 Bisa tanya lagi yang lebih sederhana? 🙏`
-    }
-    
-    // Handle token limit errors
-    if (error.message.includes("tokens") && error.message.includes("exceed")) {
-      return `Ara ara, maaf ${userName}-chan! Pertanyaannya terlalu panjang buat Suisei neko... 😢 Bisa dibagi jadi beberapa bagian? 🙏`;
-    }
-    
-    return `Ara ara, maaf ${userName}-chan! Suisei lagi bingung nih neko... 😵 Bisa tolong tanya lagi nanti? 🙏`
-  }
-}
-
+// ======================
+// TELEGRAM API FUNCTIONS
+// ======================
 async function sendMessage(chatId, text) {
   try {
-    console.log(`Sending message to ${chatId}: ${text.substring(0, 100)}...`)
-    const token = TELEGRAM_BOT_TOKEN
+    console.log(`Sending message to ${chatId}: ${text.substring(0, 100)}...`);
+    const token = TELEGRAM_BOT_TOKEN;
     
-    // Batasi maksimal 2 pesan
-    const maxMessageLength = 4096; // Telegram's max message length
-    const maxTotalLength = 8000; // Maksimal total untuk 2 pesan
-    
-    // Jika teks lebih pendek dari batas maksimal, kirim langsung
-    if (text.length <= maxMessageLength) {
+    if (text.length <= 4096) {
       await sendSingleMessage(chatId, text);
       return;
     }
     
-    // Jika teks lebih panjang dari batas maksimal total, potong terlebih dahulu
-    if (text.length > maxTotalLength) {
-      text = safeHtmlTruncate(text, maxTotalLength);
+    // Truncate if too long
+    if (text.length > CONFIG.response.maxLength) {
+      text = safeHtmlTruncate(text, CONFIG.response.maxLength);
     }
     
-    // Jika masih lebih panjang dari satu pesan, bagi menjadi 2 bagian
-    if (text.length > maxMessageLength) {
-      // Cari titik potong yang baik di tengah
+    // Split into chunks if needed
+    if (text.length > 4096) {
       const midpoint = Math.floor(text.length / 2);
       let splitIndex = text.lastIndexOf('. ', midpoint + 500);
-      if (splitIndex === -1) {
-        splitIndex = text.lastIndexOf('\n\n', midpoint + 500);
-      }
-      if (splitIndex === -1) {
-        splitIndex = text.lastIndexOf(' ', midpoint + 500);
-      }
-      if (splitIndex === -1) {
-        splitIndex = maxMessageLength;
-      }
+      if (splitIndex === -1) splitIndex = text.lastIndexOf('\n\n', midpoint + 500);
+      if (splitIndex === -1) splitIndex = text.lastIndexOf(' ', midpoint + 500);
+      if (splitIndex === -1) splitIndex = 4096;
       
       const firstPart = text.substring(0, splitIndex + 1);
       const secondPart = text.substring(splitIndex + 1).trim();
       
-      // Tambahkan indikator lanjutan di bagian pertama
-      const firstPartWithIndicator = firstPart + "\n\n<i>[Lanjutan...]</i>";
-      
-      // Kirim kedua bagian
-      await sendSingleMessage(chatId, firstPartWithIndicator);
+      await sendSingleMessage(chatId, firstPart + "\n\n<i>[Lanjutan...]</i>");
       await sendSingleMessage(chatId, secondPart);
     } else {
       await sendSingleMessage(chatId, text);
     }
   } catch (error) {
-    console.error('Error in sendMessage:', error)
+    console.error('Error in sendMessage:', error);
   }
 }
 
 async function sendSingleMessage(chatId, text) {
-  const token = TELEGRAM_BOT_TOKEN
+  const token = TELEGRAM_BOT_TOKEN;
   const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -668,19 +589,18 @@ async function sendSingleMessage(chatId, text) {
       parse_mode: 'HTML',
       disable_web_page_preview: true
     })
-  })
+  });
   
   if (!response.ok) {
-    const errorText = await response.text()
-    console.error('Error sending message:', errorText)
+    console.error('Error sending message:', await response.text());
   } else {
-    console.log('Message sent successfully')
+    console.log('Message sent successfully');
   }
 }
 
 async function sendTemporaryMessage(chatId, text) {
   try {
-    const token = TELEGRAM_BOT_TOKEN
+    const token = TELEGRAM_BOT_TOKEN;
     const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -689,23 +609,23 @@ async function sendTemporaryMessage(chatId, text) {
         text: text,
         parse_mode: 'HTML'
       })
-    })
+    });
     
     if (!response.ok) {
-      console.error('Error sending temporary message:', await response.text())
-      return null
+      console.error('Error sending temporary message:', await response.text());
+      return null;
     }
     
-    return await response.json()
+    return await response.json();
   } catch (error) {
-    console.error('Error in sendTemporaryMessage:', error)
-    return null
+    console.error('Error in sendTemporaryMessage:', error);
+    return null;
   }
 }
 
 async function deleteMessage(chatId, messageId) {
   try {
-    const token = TELEGRAM_BOT_TOKEN
+    const token = TELEGRAM_BOT_TOKEN;
     const response = await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -713,31 +633,33 @@ async function deleteMessage(chatId, messageId) {
         chat_id: chatId,
         message_id: messageId
       })
-    })
+    });
     
     if (!response.ok) {
-      console.error('Error deleting message:', await response.text())
+      console.error('Error deleting message:', await response.text());
     }
   } catch (error) {
-    console.error('Error in deleteMessage:', error)
+    console.error('Error in deleteMessage:', error);
   }
 }
 
+// ======================
+// UTILITY FUNCTIONS
+// ======================
 function escapeHtml(text) {
-  if (!text) return ''
+  if (!text) return '';
   return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+    .replace(/>/g, '&gt;');
 }
 
-// Helper function for fetch with timeout
 function fetchWithTimeout(url, options, timeout = 10000) {
-  console.log(`Fetching ${url} with timeout ${timeout}ms`)
+  console.log(`Fetching ${url} with timeout ${timeout}ms`);
   return Promise.race([
     fetch(url, options),
     new Promise((_, reject) => 
       setTimeout(() => reject(new Error('Request timeout')), timeout)
     )
-  ])
+  ]);
 }
