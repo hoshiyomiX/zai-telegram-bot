@@ -22,7 +22,7 @@ const CONFIG = {
   },
   api: {
     gemini: {
-      temperature: 0.8, // Slightly higher for more creative responses
+      temperature: 0.8,
       topK: 40,
       topP: 0.95
     }
@@ -51,15 +51,15 @@ Gaya bicara ${CONFIG.bot.name}:
 - Kadang menggunakan ekspresi seperti "uwaa~", "yatta!", "hehe"
 - Selalu mengakhiri dengan tanda tangan "${CONFIG.bot.signature} ${CONFIG.bot.name}"
 
-Ketika menyebut pengguna, gunakan format: <a href="https://t.me/${userUsername}">${userName}-chan</a>
+Ketika menyebut pengguna, gunakan placeholder: {userName}
 
 Kata-kata favorit ${CONFIG.bot.name}:
-- "${CONFIG.bot.name} akan membantu ${userName}-chan!"
+- "${CONFIG.bot.name} akan membantu {userName}!"
 - "Wah, menarik sekali!"
 - "${CONFIG.bot.name} juga suka itu!"
 - "Ayo kita pelajari bersama-sama!"
-- "${CONFIG.bot.name} senang bisa bertemu ${userName}-chan!"
-- "Semoga hari ${userName}-chan menyenangkan ya!"
+- "${CONFIG.bot.name} senang bisa bertemu {userName}!"
+- "Semoga hari {userName} menyenangkan ya!"
 - "${CONFIG.bot.name} usaha semaksimal mungkin!"
 
 Saat ini kamu sedang berbicara dengan ${userName}-chan. Jawablah pertanyaannya dengan gaya ${CONFIG.bot.name} yang imut, cerdas, dan ramah. Berikan jawaban yang informatif tapi tetap dengan kepribadian ${CONFIG.bot.name}.
@@ -70,10 +70,10 @@ Ingat:
 3. Berikan jawaban yang ramah, menyenangkan, dan informatif
 4. Jika tidak tahu jawabannya, katakan dengan jujur tapi tetap dengan gaya ${CONFIG.bot.name}
 5. Akhiri jawaban dengan tanda tangan "${CONFIG.bot.signature} ${CONFIG.bot.name}"
-6. Ketika menyebut nama pengguna, gunakan format link: <a href="https://t.me/${userUsername}">${userName}-chan</a>
+6. Ketika menyebut nama pengguna, gunakan placeholder: {userName}
 
 Contoh jawaban ${CONFIG.bot.name}:
-"Haiii <a href="https://t.me/${userUsername}">${userName}-chan</a>! 😊✨ Tentu saja ${CONFIG.bot.name} akan bantu menjelaskan! [jawaban informatif] Semoga membantu ya! ${CONFIG.bot.signature} ${CONFIG.bot.name}"
+"Haiii {userName}! 😊✨ Tentu saja ${CONFIG.bot.name} akan bantu menjelaskan! [jawaban informatif] Semoga membantu ya! ${CONFIG.bot.signature} ${CONFIG.bot.name}"
 
 Sekarang, jawab pertanyaan berikut dengan gaya ${CONFIG.bot.name}:`,
 
@@ -88,7 +88,7 @@ Sekarang, jawab pertanyaan berikut dengan gaya ${CONFIG.bot.name}:`,
 
   greetings: {
     start: (userName, userUsername) => `🌸 <b>Haiii! Aku ${CONFIG.bot.name}! ✨</b> 🌸\n\n` +
-           `Aku adalah asisten AI yang imut, cerdas, dan berusia ${CONFIG.bot.age}! Aku suka membantu <a href="https://t.me/${userUsername}">${userName}-chan</a>! 🍭\n\n` +
+           `Aku adalah asisten AI yang imut, cerdas, dan berusia ${CONFIG.bot.age}! Aku suka membantu {userName}! 🍭\n\n` +
            `Ayo kita berteman dan belajar bersama-sama! 🎀\n\n` +
            `Commands:\n` +
            `/start - Perkenalan dari ${CONFIG.bot.name}\n` +
@@ -97,7 +97,7 @@ Sekarang, jawab pertanyaan berikut dengan gaya ${CONFIG.bot.name}:`,
            `Tanyakan apa saja pada ${CONFIG.bot.name} ya! 😊`,
 
     help: (userName, userUsername) => `📖 <b>Bantuan dari ${CONFIG.bot.name}! ✨</b> 📖\n\n` +
-          `Hai <a href="https://t.me/${userUsername}">${userName}-chan</a>! ${CONFIG.bot.name} akan bantu menjelaskan cara menggunakan aku! 🌸\n\n` +
+          `Hai {userName}! ${CONFIG.bot.name} akan bantu menjelaskan cara menggunakan aku! 🌸\n\n` +
           `Cara menggunakan ${CONFIG.bot.name}:\n` +
           `• Tanyakan apa saja pada ${CONFIG.bot.name}\n` +
           `• ${CONFIG.bot.name} akan jawab dengan cara yang imut dan menyenangkan\n` +
@@ -109,19 +109,19 @@ Sekarang, jawab pertanyaan berikut dengan gaya ${CONFIG.bot.name}:`,
           `Ayo berteman dengan ${CONFIG.bot.name}! 😊🍭`,
 
     about: (userName, userUsername) => `🌸 <b>Tentang ${CONFIG.bot.name}! ✨</b> 🌸\n\n` +
-           `Hai <a href="https://t.me/${userUsername}">${userName}-chan</a>! Aku akan cerita tentang diriku! 🎀\n\n` +
+           `Hai {userName}! Aku akan cerita tentang diriku! 🎀\n\n` +
            `👤 Nama: ${CONFIG.bot.name}\n` +
            `🎂 Umur: ${CONFIG.bot.age}\n` +
            `💖 Sifat: ${CONFIG.bot.traits.join(', ')}\n\n` +
            `🍭 Suka: ${CONFIG.bot.likes.join(', ')}\n\n` +
-           `${CONFIG.bot.name} senang bisa berteman dengan <a href="https://t.me/${userUsername}">${userName}-chan</a>! Ayo kita jadi teman baik ya! 😊✨`
+           `${CONFIG.bot.name} senang bisa berteman dengan {userName}! Ayo kita jadi teman baik ya! 😊✨`
   },
 
   errors: {
-    rateLimit: (userName, userUsername) => `⚠️ Maaf <a href="https://t.me/${userUsername}">${userName}-chan</a>, ${CONFIG.bot.name} butuh istirahat dulu. Nanti kita ngobrol lagi ya dalam 1 menit! 😊`,
-    timeout: (userName, userUsername) => `Aduh <a href="https://t.me/${userUsername}">${userName}-chan</a>, ${CONFIG.bot.name} kebanyakan mikir nih... 🤔 Bisa tanya lagi yang lebih sederhana? 🙏`,
-    tokenLimit: (userName, userUsername) => `Aduh, maaf <a href="https://t.me/${userUsername}">${userName}-chan</a>! Pertanyaannya terlalu panjang buat ${CONFIG.bot.name}... 😢 Bisa dibagi jadi beberapa bagian? 🙏`,
-    general: (userName, userUsername) => `Aduh, maaf <a href="https://t.me/${userUsername}">${userName}-chan</a>! ${CONFIG.bot.name} lagi pusing nih... 😵 Bisa tolong tanya lagi nanti? 🙏`,
+    rateLimit: (userName, userUsername) => `⚠️ Maaf {userName}, ${CONFIG.bot.name} butuh istirahat dulu. Nanti kita ngobrol lagi ya dalam 1 menit! 😊`,
+    timeout: (userName, userUsername) => `Aduh {userName}, ${CONFIG.bot.name} kebanyakan mikir nih... 🤔 Bisa tanya lagi yang lebih sederhana? 🙏`,
+    tokenLimit: (userName, userUsername) => `Aduh, maaf {userName}! Pertanyaannya terlalu panjang buat ${CONFIG.bot.name}... 😢 Bisa dibagi jadi beberapa bagian? 🙏`,
+    general: (userName, userUsername) => `Aduh, maaf {userName}! ${CONFIG.bot.name} lagi pusing nih... 😵 Bisa tolong tanya lagi nanti? 🙏`,
     truncated: `📝 <i>[Respons dipotong karena terlalu panjang. ${CONFIG.bot.name} maaf ya... 😢]</i>`
   }
 };
@@ -318,11 +318,14 @@ async function processRegularMessage(chatId, text, update, userName, userUsernam
 function replacePlaceholders(text, userName, userUsername) {
   // Replace {userName} with linked version if username is available
   if (userUsername) {
-    text = text.replace(/{userName}/g, `<a href="https://t.me/${userUsername}">${userName}</a>`);
-    text = text.replace(/{name}/g, `<a href="https://t.me/${userUsername}">${userName}</a>`);
+    // Create the linked version with stylized name and -chan suffix
+    const linkedName = `<a href="https://t.me/${userUsername}">${userName}-chan</a>`;
+    text = text.replace(/{userName}/g, linkedName);
+    text = text.replace(/{name}/g, linkedName);
   } else {
-    text = text.replace(/{userName}/g, userName);
-    text = text.replace(/{name}/g, userName);
+    // If no username, just use the name with -chan
+    text = text.replace(/{userName}/g, `${userName}-chan`);
+    text = text.replace(/{name}/g, `${userName}-chan`);
   }
   return text;
 }
@@ -459,7 +462,7 @@ function extractGeminiResponse(data, userName, userUsername) {
   }
   
   if (candidate.finishReason === "MAX_TOKENS") {
-    return `Aduh <a href="https://t.me/${userUsername}">${userName}-chan</a>, jawabannya kepanjangan nih... 😢 Bisa tanya yang lebih spesifik? 🙏`;
+    return `Aduh {userName}, jawabannya kepanjangan nih... 😢 Bisa tanya yang lebih spesifik? 🙏`;
   }
   
   throw new Error('Unexpected response format from Gemini API: no content parts');
@@ -524,7 +527,7 @@ function formatToTelegramHTML(text) {
   };
   
   Object.keys(emojiMap).forEach(keyword => {
-    const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+    const regex = new RegExp(`\\b${keyword}\\b`, 'gi`);
     formatted = formatted.replace(regex, emojiMap[keyword] + " $&");
   });
   
