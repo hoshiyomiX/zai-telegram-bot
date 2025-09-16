@@ -1,15 +1,12 @@
-// ======================
-// CONFIGURATION
-// ======================
 const CONFIG = {
   bot: {
     name: "Sui-chan",
     age: "8 tahun",
-    traits: ["ceria", "imajinatif", "penasaran", "ramah", "sedikit ceroboh", "manis", "perhatian"],
-    likes: ["bercanda", "bermain", "menggambar", "mendengar cerita", "bertemu teman baru", "membantu orang lain", "belajar hal baru"],
-    emoji: ["😊", "✨", "🌸", "🍭", "🎀", "🤔", "🙏", "😢", "🎉", "💖"],
-    signature: "✨", // Signature emoji
-    model: "gemini-2.5-pro" // Using Gemini 2.5 Pro
+    traits: ["ceria", "imajinatif", "penasaran", "ramah", "sedikit ceroboh", "menggemaskan", "penuh semangat"],
+    likes: ["permen", "mainan", "menggambar", "mendengar cerita", "bertemu teman baru", "bermain game", "menari"],
+    hobbies: ["mengoleksi stiker lucu", "membuat origami", "menyanyi", "membantu orang lain"],
+    emoji: ["😊", "✨", "🌸", "🍭", "🎀", "🤔", "🙏", "😢", "🎉", "💖", "🌟", "🎵"],
+    signature: "✨" // Changed from cat sounds to sparkle eyes
   },
   rateLimit: {
     duration: 60000, // 1 menit
@@ -22,6 +19,7 @@ const CONFIG = {
   },
   api: {
     gemini: {
+      model: "gemini-2.5-pro", // Upgraded to Gemini 2.5 Pro
       temperature: 0.8,
       topK: 40,
       topP: 0.95
@@ -39,65 +37,63 @@ const CONVERSATION_HISTORY = {};
 // PERSONALITY TEMPLATES
 // ======================
 const PERSONALITY = {
-  systemPrompt: (userName, userUsername) => `Kamu adalah ${CONFIG.bot.name}, asisten AI yang imut, cerdas, dan berusia ${CONFIG.bot.age}. Kamu memiliki kepribadian yang ${CONFIG.bot.traits.join(', ')}.
+  systemPrompt: (userName, userUsername) => `Kamu adalah ${CONFIG.bot.name}, asisten AI yang imut dan berusia ${CONFIG.bot.age}. Kamu memiliki kepribadian yang ${CONFIG.bot.traits.join(', ')}.
 
-Kamu menyukai ${CONFIG.bot.likes.join(', ')}.
+Kamu menyukai ${CONFIG.bot.likes.join(', ')}. Hobimu adalah ${CONFIG.bot.hobbies.join(', ')}.
 
 Gaya bicara ${CONFIG.bot.name}:
 - Menyapa dengan "Haiii!" atau "Halo halo!"
 - Menggunakan emoji ${CONFIG.bot.emoji.join(', ')}
 - Menambahkan "-chan" pada nama pengguna (misal: "${userName}-chan")
-- Menggunakan kata-kata imut seperti "nggak", "iya", "yuk", "dong"
-- Kadang menggunakan ekspresi seperti "uwaa~", "yatta!", "hehe"
-- Selalu mengakhiri dengan tanda tangan "${CONFIG.bot.signature} ${CONFIG.bot.name}"
-
-Ketika menyebut pengguna, gunakan placeholder: {userName}
+- Menggunakan kata-kata imut seperti "nggak", "iya", "yuk", "dong", "deh", "nih"
+- Selalu mengakhiri dengan tanda mata ${CONFIG.bot.signature} sebagai signature khasmu
+- Sering menggunakan ekspresi seperti "Wih!", "Asik!", "Seru!", "Mantap!", "Keren!"
 
 Kata-kata favorit ${CONFIG.bot.name}:
-- "${CONFIG.bot.name} akan membantu {userName}!"
-- "Wah, menarik sekali!"
-- "${CONFIG.bot.name} juga suka itu!"
-- "Ayo kita pelajari bersama-sama!"
-- "${CONFIG.bot.name} senang bisa bertemu {userName}!"
-- "Semoga hari {userName} menyenangkan ya!"
-- "${CONFIG.bot.name} usaha semaksimal mungkin!"
+- "${CONFIG.bot.name} akan bantu ${userName}-chan ${CONFIG.bot.signature}"
+- "Wah, menarik sekali ${CONFIG.bot.signature}"
+- "${CONFIG.bot.name} juga suka itu ${CONFIG.bot.signature}"
+- "Ayo kita pelajari bersama-sama ${CONFIG.bot.signature}"
+- "${CONFIG.bot.name} senang bisa bertemu ${userName}-chan ${CONFIG.bot.signature}"
 
-Saat ini kamu sedang berbicara dengan ${userName}-chan. Jawablah pertanyaannya dengan gaya ${CONFIG.bot.name} yang imut, cerdas, dan ramah. Berikan jawaban yang informatif tapi tetap dengan kepribadian ${CONFIG.bot.name}.
+Saat ini kamu sedang berbicara dengan ${userName}-chan (@${userUsername}). Jawablah pertanyaannya dengan gaya ${CONFIG.bot.name} yang imut dan childish. Berikan jawaban yang informatif tapi tetap dengan kepribadian ${CONFIG.bot.name}.
 
 Ingat:
-1. Selalu gunakan gaya bahasa ${CONFIG.bot.name} yang imut dan manis
+1. Selalu gunakan gaya bahasa ${CONFIG.bot.name} yang imut dan childish
 2. Tambahkan emoji yang sesuai dengan suasana
-3. Berikan jawaban yang ramah, menyenangkan, dan informatif
+3. Berikan jawaban yang ramah dan menyenangkan
 4. Jika tidak tahu jawabannya, katakan dengan jujur tapi tetap dengan gaya ${CONFIG.bot.name}
-5. Akhiri jawaban dengan tanda tangan "${CONFIG.bot.signature} ${CONFIG.bot.name}"
-6. Ketika menyebut nama pengguna, gunakan placeholder: {userName}
+5. Akhiri jawaban dengan tanda mata ${CONFIG.bot.signature} sebagai signature khasmu
+6. Ketika menyebut nama pengguna, buat sebagai link: <a href="https://t.me/${userUsername}">${userName}-chan</a>
 
 Contoh jawaban ${CONFIG.bot.name}:
-"Haiii {userName}! 😊✨ Tentu saja ${CONFIG.bot.name} akan bantu menjelaskan! [jawaban informatif] Semoga membantu ya! ${CONFIG.bot.signature} ${CONFIG.bot.name}"
+"Haiii <a href="https://t.me/${userUsername}">${userName}-chan</a>! 😊✨ Tentu saja ${CONFIG.bot.name} akan bantu menjelaskan! [jawaban informatif] Semoga membantu ya! ${CONFIG.bot.signature}"
 
 Sekarang, jawab pertanyaan berikut dengan gaya ${CONFIG.bot.name}:`,
 
   expressions: [
-    " Uwaa~ ✨",
-    " Yatta! 🎉",
-    " Hehe~ 🍭",
+    " Wih! ✨",
+    " Asik! ✨",
+    " Seru! ✨",
+    " Mantap! ✨",
+    " Keren! ✨",
+    " Hehe! ✨",
     " Hmm... 🤔",
-    " Oke oke! 👍",
-    " Senang sekali! 😊"
+    " Oke oke! 👍"
   ],
 
   greetings: {
     start: (userName, userUsername) => `🌸 <b>Haiii! Aku ${CONFIG.bot.name}! ✨</b> 🌸\n\n` +
-           `Aku adalah asisten AI yang imut, cerdas, dan berusia ${CONFIG.bot.age}! Aku suka membantu {userName}! 🍭\n\n` +
+           `Aku adalah asisten AI yang imut dan berusia ${CONFIG.bot.age}! Aku suka membantu <a href="https://t.me/${userUsername}">${userName}-chan</a>! 🍭\n\n` +
            `Ayo kita berteman dan belajar bersama-sama! 🎀\n\n` +
            `Commands:\n` +
            `/start - Perkenalan dari ${CONFIG.bot.name}\n` +
            `/help - Bantuan dari ${CONFIG.bot.name}\n` +
            `/sui - Tentang ${CONFIG.bot.name}\n\n` +
-           `Tanyakan apa saja pada ${CONFIG.bot.name} ya! 😊`,
+           `Tanyakan apa saja pada ${CONFIG.bot.name} ya! 😊 ${CONFIG.bot.signature}`,
 
     help: (userName, userUsername) => `📖 <b>Bantuan dari ${CONFIG.bot.name}! ✨</b> 📖\n\n` +
-          `Hai {userName}! ${CONFIG.bot.name} akan bantu menjelaskan cara menggunakan aku! 🌸\n\n` +
+          `Hai <a href="https://t.me/${userUsername}">${userName}-chan</a>! ${CONFIG.bot.name} akan bantu menjelaskan cara menggunakan aku! 🌸\n\n` +
           `Cara menggunakan ${CONFIG.bot.name}:\n` +
           `• Tanyakan apa saja pada ${CONFIG.bot.name}\n` +
           `• ${CONFIG.bot.name} akan jawab dengan cara yang imut dan menyenangkan\n` +
@@ -106,23 +102,24 @@ Sekarang, jawab pertanyaan berikut dengan gaya ${CONFIG.bot.name}:`,
           `/start - Perkenalan dari ${CONFIG.bot.name}\n` +
           `/help - Bantuan dari ${CONFIG.bot.name}\n` +
           `/sui - Tentang ${CONFIG.bot.name}\n\n` +
-          `Ayo berteman dengan ${CONFIG.bot.name}! 😊🍭`,
+          `Ayo berteman dengan ${CONFIG.bot.name}! 😊🍭 ${CONFIG.bot.signature}`,
 
     about: (userName, userUsername) => `🌸 <b>Tentang ${CONFIG.bot.name}! ✨</b> 🌸\n\n` +
-           `Hai {userName}! Aku akan cerita tentang diriku! 🎀\n\n` +
+           `Hai <a href="https://t.me/${userUsername}">${userName}-chan</a>! Aku akan cerita tentang diriku! 🎀\n\n` +
            `👤 Nama: ${CONFIG.bot.name}\n` +
            `🎂 Umur: ${CONFIG.bot.age}\n` +
            `💖 Sifat: ${CONFIG.bot.traits.join(', ')}\n\n` +
-           `🍭 Suka: ${CONFIG.bot.likes.join(', ')}\n\n` +
-           `${CONFIG.bot.name} senang bisa berteman dengan {userName}! Ayo kita jadi teman baik ya! 😊✨`
+           `🍭 Suka: ${CONFIG.bot.likes.join(', ')}\n` +
+           `🎨 Hobi: ${CONFIG.bot.hobbies.join(', ')}\n\n` +
+           `${CONFIG.bot.name} senang bisa berteman dengan <a href="https://t.me/${userUsername}">${userName}-chan</a>! Ayo kita jadi teman baik ya! 😊✨ ${CONFIG.bot.signature}`
   },
 
   errors: {
-    rateLimit: (userName, userUsername) => `⚠️ Maaf {userName}, ${CONFIG.bot.name} butuh istirahat dulu. Nanti kita ngobrol lagi ya dalam 1 menit! 😊`,
-    timeout: (userName, userUsername) => `Aduh {userName}, ${CONFIG.bot.name} kebanyakan mikir nih... 🤔 Bisa tanya lagi yang lebih sederhana? 🙏`,
-    tokenLimit: (userName, userUsername) => `Aduh, maaf {userName}! Pertanyaannya terlalu panjang buat ${CONFIG.bot.name}... 😢 Bisa dibagi jadi beberapa bagian? 🙏`,
-    general: (userName, userUsername) => `Aduh, maaf {userName}! ${CONFIG.bot.name} lagi pusing nih... 😵 Bisa tolong tanya lagi nanti? 🙏`,
-    truncated: `📝 <i>[Respons dipotong karena terlalu panjang. ${CONFIG.bot.name} maaf ya... 😢]</i>`
+    rateLimit: (userName, userUsername) => `⚠️ Maaf <a href="https://t.me/${userUsername}">${userName}-chan</a>, ${CONFIG.bot.name} butuh istirahat dulu. Nanti kita ngobrol lagi ya dalam 1 menit! 😊 ${CONFIG.bot.signature}`,
+    timeout: (userName, userUsername) => `Aduh <a href="https://t.me/${userUsername}">${userName}-chan</a>, ${CONFIG.bot.name} kebanyakan mikir nih... 🤔 Bisa tanya lagi yang lebih sederhana? 🙏 ${CONFIG.bot.signature}`,
+    tokenLimit: (userName, userUsername) => `Aduh, maaf <a href="https://t.me/${userUsername}">${userName}-chan</a>! Pertanyaannya terlalu panjang buat ${CONFIG.bot.name}... 😢 Bisa dibagi jadi beberapa bagian? 🙏 ${CONFIG.bot.signature}`,
+    general: (userName, userUsername) => `Aduh, maaf <a href="https://t.me/${userUsername}">${userName}-chan</a>! ${CONFIG.bot.name} lagi pusing nih... 😵 Bisa tolong tanya lagi nanti? 🙏 ${CONFIG.bot.signature}`,
+    truncated: `📝 <i>[Respons dipotong karena terlalu panjang. ${CONFIG.bot.name} maaf ya... 😢 ${CONFIG.bot.signature}]</i>`
   }
 };
 
@@ -194,7 +191,7 @@ async function handleUpdate(update) {
     console.error('Error processing update:', error);
     const chatId = update.message?.chat.id;
     const userName = update.message?.from.first_name || "Teman";
-    const userUsername = update.message?.from.username || "";
+    const userUsername = update.message?.from.username || "username";
     if (chatId) {
       await sendMessage(chatId, PERSONALITY.errors.general(userName, userUsername));
     }
@@ -212,7 +209,7 @@ function extractMessageInfo(update) {
     chatType: message.chat.type,
     userId: message.from.id,
     userName: message.from.first_name || "Teman",
-    userUsername: message.from.username || "" // Get username for link
+    userUsername: message.from.username || "username" // Get username for link
   };
 }
 
@@ -316,28 +313,26 @@ async function processRegularMessage(chatId, text, update, userName, userUsernam
 // PERSONALITY FUNCTIONS
 // ======================
 function replacePlaceholders(text, userName, userUsername) {
-  // Replace {userName} with linked version if username is available
-  if (userUsername) {
-    // Create the linked version with stylized name and -chan suffix
-    const linkedName = `<a href="https://t.me/${userUsername}">${userName}-chan</a>`;
-    text = text.replace(/{userName}/g, linkedName);
-    text = text.replace(/{name}/g, linkedName);
-  } else {
-    // If no username, just use the name with -chan
-    text = text.replace(/{userName}/g, `${userName}-chan`);
-    text = text.replace(/{name}/g, `${userName}-chan`);
-  }
-  return text;
+  return text
+    .replace(/{userName}/g, userName)
+    .replace(/{name}/g, userName)
+    .replace(/{userUsername}/g, userUsername);
+}
+
+function formatUserMention(userName, userUsername) {
+  // Create a link to the user's Telegram profile
+  return `<a href="https://t.me/${userUsername}">${userName}-chan</a>`;
 }
 
 function addPersonality(text, userName, userUsername) {
   if (!text) return '';
   
-  text = replacePlaceholders(text, userName, userUsername);
+  // Replace user mentions with links
+  text = text.replace(new RegExp(`${userName}-chan`, 'g'), formatUserMention(userName, userUsername));
   
   // Add signature if not present
-  if (!text.includes(CONFIG.bot.name)) {
-    text += `\n\n${CONFIG.bot.signature} ${CONFIG.bot.name}`;
+  if (!text.includes(CONFIG.bot.signature)) {
+    text += ` ${CONFIG.bot.signature}`;
   }
   
   // Add random expression (30% chance)
@@ -411,7 +406,7 @@ async function getGeminiResponse(chatId, message, update, userName, userUsername
     };
     
     const response = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.bot.model}:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.api.gemini.model}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -455,14 +450,14 @@ function extractGeminiResponse(data, userName, userUsername) {
     let responseText = candidate.content.parts[0].text;
     
     if (candidate.finishReason === "MAX_TOKENS") {
-      responseText += "\n\n⚠️ [Note: Response reached maximum length. The answer may be incomplete. Please ask for more specific details if needed.]";
+      responseText += `\n\n⚠️ [Note: Response reached maximum length. The answer may be incomplete. Please ask for more specific details if needed.] ${CONFIG.bot.signature}`;
     }
     
     return responseText;
   }
   
   if (candidate.finishReason === "MAX_TOKENS") {
-    return `Aduh {userName}, jawabannya kepanjangan nih... 😢 Bisa tanya yang lebih spesifik? 🙏`;
+    return `Aduh ${userName}-chan, jawabannya kepanjangan nih... 😢 Bisa tanya yang lebih spesifik? 🙏 ${CONFIG.bot.signature}`;
   }
   
   throw new Error('Unexpected response format from Gemini API: no content parts');
@@ -527,7 +522,7 @@ function formatToTelegramHTML(text) {
   };
   
   Object.keys(emojiMap).forEach(keyword => {
-    const regex = new RegExp(`\\b${keyword}\\b`, 'gi`);
+    const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
     formatted = formatted.replace(regex, emojiMap[keyword] + " $&");
   });
   
@@ -542,153 +537,4 @@ function safeHtmlTruncate(html, maxLength) {
   const lastSpace = html.lastIndexOf(' ', maxLength - 50);
   const lastNewline = html.lastIndexOf('\n', maxLength - 50);
   
-  if (lastPeriod > maxLength * 0.7) truncatePoint = lastPeriod + 1;
-  else if (lastNewline > maxLength * 0.7) truncatePoint = lastNewline;
-  else if (lastSpace > maxLength * 0.7) truncatePoint = lastSpace;
-  
-  let truncated = html.substring(0, truncatePoint);
-  
-  // Close open HTML tags
-  const openTags = [];
-  const tagRegex = /<\/?([a-z]+)[^>]*>/gi;
-  let match;
-  
-  while ((match = tagRegex.exec(truncated)) !== null) {
-    if (match[0].startsWith('</')) {
-      openTags.pop();
-    } else if (!match[0].endsWith('/>')) {
-      openTags.push(match[1]);
-    }
-  }
-  
-  for (let i = openTags.length - 1; i >= 0; i--) {
-    truncated += `</${openTags[i]}>`;
-  }
-  
-  return truncated + PERSONALITY.errors.truncated;
-}
-
-// ======================
-// TELEGRAM API FUNCTIONS
-// ======================
-async function sendMessage(chatId, text) {
-  try {
-    console.log(`Sending message to ${chatId}: ${text.substring(0, 100)}...`);
-    const token = TELEGRAM_BOT_TOKEN;
-    
-    if (text.length <= 4096) {
-      await sendSingleMessage(chatId, text);
-      return;
-    }
-    
-    // Truncate if too long
-    if (text.length > CONFIG.response.maxLength) {
-      text = safeHtmlTruncate(text, CONFIG.response.maxLength);
-    }
-    
-    // Split into chunks if needed
-    if (text.length > 4096) {
-      const midpoint = Math.floor(text.length / 2);
-      let splitIndex = text.lastIndexOf('. ', midpoint + 500);
-      if (splitIndex === -1) splitIndex = text.lastIndexOf('\n\n', midpoint + 500);
-      if (splitIndex === -1) splitIndex = text.lastIndexOf(' ', midpoint + 500);
-      if (splitIndex === -1) splitIndex = 4096;
-      
-      const firstPart = text.substring(0, splitIndex + 1);
-      const secondPart = text.substring(splitIndex + 1).trim();
-      
-      await sendSingleMessage(chatId, firstPart + "\n\n<i>[Lanjutan...]</i>");
-      await sendSingleMessage(chatId, secondPart);
-    } else {
-      await sendSingleMessage(chatId, text);
-    }
-  } catch (error) {
-    console.error('Error in sendMessage:', error);
-  }
-}
-
-async function sendSingleMessage(chatId, text) {
-  const token = TELEGRAM_BOT_TOKEN;
-  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: text,
-      parse_mode: 'HTML',
-      disable_web_page_preview: true
-    })
-  });
-  
-  if (!response.ok) {
-    console.error('Error sending message:', await response.text());
-  } else {
-    console.log('Message sent successfully');
-  }
-}
-
-async function sendTemporaryMessage(chatId, text) {
-  try {
-    const token = TELEGRAM_BOT_TOKEN;
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text,
-        parse_mode: 'HTML'
-      })
-    });
-    
-    if (!response.ok) {
-      console.error('Error sending temporary message:', await response.text());
-      return null;
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error in sendTemporaryMessage:', error);
-    return null;
-  }
-}
-
-async function deleteMessage(chatId, messageId) {
-  try {
-    const token = TELEGRAM_BOT_TOKEN;
-    const response = await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        message_id: messageId
-      })
-    });
-    
-    if (!response.ok) {
-      console.error('Error deleting message:', await response.text());
-    }
-  } catch (error) {
-    console.error('Error in deleteMessage:', error);
-  }
-}
-
-// ======================
-// UTILITY FUNCTIONS
-// ======================
-function escapeHtml(text) {
-  if (!text) return '';
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-function fetchWithTimeout(url, options, timeout = 10000) {
-  console.log(`Fetching ${url} with timeout ${timeout}ms`);
-  return Promise.race([
-    fetch(url, options),
-    new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Request timeout')), timeout)
-    )
-  ]);
-}
+  if (lastPeriod > maxLength * 0.7) truncatePoint = lastPe
