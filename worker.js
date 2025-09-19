@@ -38,14 +38,13 @@ const CONFIG = {
 // ======================
 const RATE_LIMIT = {};
 const CONVERSATION_HISTORY = {};
-let lastCleanupTime = 0;
+let lastCleanupTime = Date.now();
 
 // ======================
 // PERSONALITY TEMPLATES
 // ======================
 const PERSONALITY = {
-  systemPrompt: (userName, userUsername) => {
-    return `Kamu adalah ${CONFIG.bot.name}, asisten AI yang imut dan berusia ${CONFIG.bot.age}. Kamu memiliki kepribadian yang ${CONFIG.bot.traits.join(', ')}.
+  systemPrompt: (userName, userUsername) => `Kamu adalah ${CONFIG.bot.name}, asisten AI yang imut dan berusia ${CONFIG.bot.age}. Kamu memiliki kepribadian yang ${CONFIG.bot.traits.join(', ')}.
 
 Kamu menyukai ${CONFIG.bot.likes.join(', ')}.
 
@@ -65,7 +64,7 @@ Kata-kata favorit ${CONFIG.bot.name}:
 - "${CONFIG.bot.name} senang bisa bertemu ${userName}-chan!"
 - "Btw, panggil aku ${CONFIG.bot.name} aja ya!"
 
-Saat ini kamu sedang berbicara dengan ${userName}-chan (@${userUsername}). Jawablah pertanyaannya dengan gaya ${CONFIG.bot.name} yang imut dan childish. Berikan jawaban yang informatif tapi tetap dengan kepribadian ${CONFIG.bot.name}.
+Saat ini kamu sedang berbicara dengan ${userName}-chan. Jawablah pertanyaannya dengan gaya ${CONFIG.bot.name} yang imut dan childish. Berikan jawaban yang informatif tapi tetap dengan kepribadian ${CONFIG.bot.name}.
 
 Ingat:
 1. Selalu gunakan gaya bahasa ${CONFIG.bot.name} yang imut dan childish
@@ -73,16 +72,15 @@ Ingat:
 3. Berikan jawaban yang ramah dan menyenangkan
 4. Jika tidak tahu jawabannya, katakan dengan jujur tapi tetap dengan gaya ${CONFIG.bot.name}
 5. Akhiri jawaban dengan tanda tangan "\\n\\n~ ${CONFIG.bot.name} ${CONFIG.bot.signature}"
-6. Jika menyebut nama pengguna, gunakan format: <a href="tg://user?id=${userUsername}">${userName}</a>
+6. Jika menyebut nama pengguna, gunakan format: ${userName} (jangan gunakan format link HTML, cukup tulis nama saja)
 
 Contoh jawaban ${CONFIG.bot.name}:
-"Haiii <a href="tg://user?id=${userUsername}">${userName}</a>-chan! 😊✨ Tentu saja ${CONFIG.bot.name} akan bantu menjelaskan! [jawaban informatif] 
+"Haiii ${userName}-chan! 😊✨ Tentu saja ${CONFIG.bot.name} akan bantu menjelaskan! [jawaban informatif] 
 
 ~ ${CONFIG.bot.name} ${CONFIG.bot.signature}"
 
-Sekarang, jawab pertanyaan berikut dengan gaya ${CONFIG.bot.name}:`;
-  },
-  
+Sekarang, jawab pertanyaan berikut dengan gaya ${CONFIG.bot.name}:`,
+
   expressions: [
     " Uwaa~ ✨",
     " Kyaa~ 😊",
@@ -93,58 +91,42 @@ Sekarang, jawab pertanyaan berikut dengan gaya ${CONFIG.bot.name}:`;
   ],
 
   greetings: {
-    start: (userName, userUsername) => {
-      return `🌸 <b>Haiii! Aku ${CONFIG.bot.name}! ✨</b> 🌸\n\n` +
-             `Aku adalah asisten AI yang imut dan berusia ${CONFIG.bot.age}! Aku suka membantu <a href="tg://user?id=${userUsername}">${userName}</a>-chan! 🍭\n\n` +
-             `Ayo kita berteman dan belajar bersama-sama! 🎀\n\n` +
-             `Commands:\n` +
-             `/start - Perkenalan dari ${CONFIG.bot.name}\n` +
-             `/help - Bantuan dari ${CONFIG.bot.name}\n` +
-             `/sui - Tentang ${CONFIG.bot.name}\n\n` +
-             `Tanyakan apa saja pada ${CONFIG.bot.name} ya! 😊`;
-    },
-    
-    help: (userName, userUsername) => {
-      return `📖 <b>Bantuan dari ${CONFIG.bot.name}! ✨</b> 📖\n\n` +
-             `Hai <a href="tg://user?id=${userUsername}">${userName}</a>-chan! ${CONFIG.bot.name} akan bantu menjelaskan cara menggunakan aku! 🌸\n\n` +
-             `Cara menggunakan ${CONFIG.bot.name}:\n` +
-             `• Tanyakan apa saja pada ${CONFIG.bot.name}\n` +
-             `• ${CONFIG.bot.name} akan jawab dengan cara yang imut dan menyenangkan\n` +
-             `• ${CONFIG.bot.name} bisa ingat percakapan kita sebelumnya\n\n` +
-             `Commands:\n` +
-             `/start - Perkenalan dari ${CONFIG.bot.name}\n` +
-             `/help - Bantuan dari ${CONFIG.bot.name}\n` +
-             `/sui - Tentang ${CONFIG.bot.name}\n\n` +
-             `Ayo berteman dengan ${CONFIG.bot.name}! 😊🍭`;
-    },
-    
-    about: (userName, userUsername) => {
-      return `🌸 <b>Tentang ${CONFIG.bot.name}! ✨</b> 🌸\n\n` +
-             `Hai <a href="tg://user?id=${userUsername}">${userName}</a>-chan! Aku akan cerita tentang diriku! 🎀\n\n` +
-             `👤 Nama: ${CONFIG.bot.name}\n` +
-             `🎂 Umur: ${CONFIG.bot.age}\n` +
-             `💖 Sifat: ${CONFIG.bot.traits.join(', ')}\n\n` +
-             `🍭 Suka: ${CONFIG.bot.likes.join(', ')}\n\n` +
-             `${CONFIG.bot.name} senang bisa berteman dengan <a href="tg://user?id=${userUsername}">${userName}</a>-chan! Ayo kita jadi teman baik ya! 😊✨`;
-    }
+    start: (userName, userUsername) => `🌸 <b>Haiii! Aku ${CONFIG.bot.name}! ✨</b> 🌸\n\n` +
+           `Aku adalah asisten AI yang imut dan berusia ${CONFIG.bot.age}! Aku suka membantu ${userName}-chan! 🍭\n\n` +
+           `Ayo kita berteman dan belajar bersama-sama! 🎀\n\n` +
+           `Commands:\n` +
+           `/start - Perkenalan dari ${CONFIG.bot.name}\n` +
+           `/help - Bantuan dari ${CONFIG.bot.name}\n` +
+           `/sui - Tentang ${CONFIG.bot.name}\n\n` +
+           `Tanyakan apa saja pada ${CONFIG.bot.name} ya! 😊`,
+
+    help: (userName, userUsername) => `📖 <b>Bantuan dari ${CONFIG.bot.name}! ✨</b> 📖\n\n` +
+          `Hai ${userName}-chan! ${CONFIG.bot.name} akan bantu menjelaskan cara menggunakan aku! 🌸\n\n` +
+          `Cara menggunakan ${CONFIG.bot.name}:\n` +
+          `• Tanyakan apa saja pada ${CONFIG.bot.name}\n` +
+          `• ${CONFIG.bot.name} akan jawab dengan cara yang imut dan menyenangkan\n` +
+          `• ${CONFIG.bot.name} bisa ingat percakapan kita sebelumnya\n\n` +
+          `Commands:\n` +
+          `/start - Perkenalan dari ${CONFIG.bot.name}\n` +
+          `/help - Bantuan dari ${CONFIG.bot.name}\n` +
+          `/sui - Tentang ${CONFIG.bot.name}\n\n` +
+          `Ayo berteman dengan ${CONFIG.bot.name}! 😊🍭`,
+
+    about: (userName, userUsername) => `🌸 <b>Tentang ${CONFIG.bot.name}! ✨</b> 🌸\n\n` +
+           `Hai ${userName}-chan! Aku akan cerita tentang diriku! 🎀\n\n` +
+           `👤 Nama: ${CONFIG.bot.name}\n` +
+           `🎂 Umur: ${CONFIG.bot.age}\n` +
+           `💖 Sifat: ${CONFIG.bot.traits.join(', ')}\n\n` +
+           `🍭 Suka: ${CONFIG.bot.likes.join(', ')}\n\n` +
+           `${CONFIG.bot.name} senang bisa berteman dengan ${userName}-chan! Ayo kita jadi teman baik ya! 😊✨`
   },
 
   errors: {
-    rateLimit: (userName, userUsername) => {
-      return `⚠️ Maaf <a href="tg://user?id=${userUsername}">${userName}</a>-chan, ${CONFIG.bot.name} butuh istirahat dulu. Nanti kita ngobrol lagi ya dalam 1 menit! 😊`;
-    },
-    timeout: (userName, userUsername) => {
-      return `Aduh <a href="tg://user?id=${userUsername}">${userName}</a>-chan, ${CONFIG.bot.name} kebanyakan mikir nih... 🤔 Bisa tanya lagi yang lebih sederhana? 🙏`;
-    },
-    tokenLimit: (userName, userUsername) => {
-      return `Aduh, maaf <a href="tg://user?id=${userUsername}">${userName}</a>-chan! Pertanyaannya terlalu panjang buat ${CONFIG.bot.name}... 😢 Bisa dibagi jadi beberapa bagian? 🙏`;
-    },
-    general: (userName, userUsername) => {
-      return `Aduh, maaf <a href="tg://user?id=${userUsername}">${userName}</a>-chan! ${CONFIG.bot.name} lagi pusing nih... 😵 Bisa tolong tanya lagi nanti? 🙏`;
-    },
-    apiError: (userName, userUsername) => {
-      return `Aduh <a href="tg://user?id=${userUsername}">${userName}</a>-chan! ${CONFIG.bot.name} nggak bisa terhubung ke otaknya nih... 😢 Bisa coba lagi nanti? 🙏`;
-    },
+    rateLimit: (userName, userUsername) => `⚠️ Maaf ${userName}-chan, ${CONFIG.bot.name} butuh istirahat dulu. Nanti kita ngobrol lagi ya dalam 1 menit! 😊`,
+    timeout: (userName, userUsername) => `Aduh ${userName}-chan, ${CONFIG.bot.name} kebanyakan mikir nih... 🤔 Bisa tanya lagi yang lebih sederhana? 🙏`,
+    tokenLimit: (userName, userUsername) => `Aduh, maaf ${userName}-chan! Pertanyaannya terlalu panjang buat ${CONFIG.bot.name}... 😢 Bisa dibagi jadi beberapa bagian? 🙏`,
+    general: (userName, userUsername) => `Aduh, maaf ${userName}-chan! ${CONFIG.bot.name} lagi pusing nih... 😵 Bisa tolong tanya lagi nanti? 🙏`,
+    apiError: (userName, userUsername) => `Aduh ${userName}-chan! ${CONFIG.bot.name} nggak bisa terhubung ke otaknya nih... 😢 Bisa coba lagi nanti? 🙏`,
     truncated: `📝 <i>[Respons dipotong karena terlalu panjang. ${CONFIG.bot.name} maaf ya... 😢]</i>`
   }
 };
@@ -153,14 +135,14 @@ Sekarang, jawab pertanyaan berikut dengan gaya ${CONFIG.bot.name}:`;
 // MAIN HANDLER
 // ======================
 addEventListener('fetch', event => {
-  event.respondWith(handleRequest(event));
+  event.respondWith(handleRequest(event))
 });
 
 async function handleRequest(event) {
   const request = event.request;
   
   // Perform cleanup if needed
-  cleanupMemory();
+  performCleanup();
   
   if (request.method === 'GET') {
     return new Response(`${CONFIG.bot.name} is running!`);
@@ -192,36 +174,36 @@ async function handleUpdate(update) {
       return;
     }
     
-    const messageInfo = extractMessageInfo(update);
-    console.log(`Message from ${messageInfo.chatId}: ${messageInfo.text}`);
+    const { chatId, text, chatType, userId, userName, userUsername } = extractMessageInfo(update);
+    console.log(`Message from ${chatId}: ${text}`);
     
     // Rate limiting check
-    if (checkRateLimit(messageInfo)) {
+    if (checkRateLimit(userId, chatId, userName, userUsername)) {
       return;
     }
     
     // Check if should respond
-    if (!shouldRespond(update, messageInfo)) {
+    if (!shouldRespond(update, text, chatType)) {
       console.log('Ignoring message in group: not tagged or replied to bot');
       return;
     }
     
     // Handle commands
-    if (messageInfo.text.startsWith('/')) {
-      await handleCommands(messageInfo);
+    if (text.startsWith('/')) {
+      await handleCommands(chatId, text, userName, userUsername);
       return;
     }
     
     // Process regular message
-    if (messageInfo.text.trim() !== '') {
-      await processRegularMessage(messageInfo, update);
+    if (text.trim() !== '') {
+      await processRegularMessage(chatId, text, update, userName, userUsername);
     }
   } catch (error) {
     console.error('Error processing update:', error);
     const chatId = update.message?.chat.id;
+    const userName = update.message?.from.first_name || "Teman";
+    const userUsername = update.message?.from.username || "username";
     if (chatId) {
-      const userName = update.message?.from.first_name || "Teman";
-      const userUsername = update.message?.from.username || "username";
       await sendMessage(chatId, PERSONALITY.errors.general(userName, userUsername));
     }
   }
@@ -238,12 +220,11 @@ function extractMessageInfo(update) {
     chatType: message.chat.type,
     userId: message.from.id,
     userName: message.from.first_name || "Teman",
-    userUsername: message.from.username || message.from.id
+    userUsername: message.from.username || message.from.id // Fallback to user ID if no username
   };
 }
 
-function checkRateLimit(messageInfo) {
-  const { userId, chatId, userName, userUsername } = messageInfo;
+function checkRateLimit(userId, chatId, userName, userUsername) {
   const now = Date.now();
   
   if (!RATE_LIMIT[userId]) {
@@ -264,8 +245,7 @@ function checkRateLimit(messageInfo) {
   return false;
 }
 
-function shouldRespond(update, messageInfo) {
-  const { text, chatType } = messageInfo;
+function shouldRespond(update, text, chatType) {
   const isGroup = chatType === 'group' || chatType === 'supergroup';
   const BOT_ID = TELEGRAM_BOT_TOKEN.split(':')[0];
   const BOT_USERNAME = TELEGRAM_BOT_USERNAME;
@@ -285,8 +265,7 @@ function shouldRespond(update, messageInfo) {
   return false;
 }
 
-async function handleCommands(messageInfo) {
-  const { chatId, text, userName, userUsername } = messageInfo;
+async function handleCommands(chatId, text, userName, userUsername) {
   let commandText = text.split(' ')[0].toLowerCase();
   
   if (commandText.includes('@')) {
@@ -310,12 +289,11 @@ async function handleCommands(messageInfo) {
   }
 }
 
-async function processRegularMessage(messageInfo, update) {
-  const { chatId, text, userName, userUsername } = messageInfo;
+async function processRegularMessage(chatId, text, update, userName, userUsername) {
   const thinkingMessage = await sendTemporaryMessage(chatId, `🌸 ${CONFIG.bot.name} sedang mikir... ✨`);
   
   try {
-    const aiResponse = await getGLMResponse(messageInfo, update);
+    const aiResponse = await getGLMResponse(chatId, text, update, userName, userUsername);
     const formattedResponse = formatToTelegramHTML(aiResponse);
     const personalityResponse = addPersonality(formattedResponse, userName, userUsername);
     
@@ -325,7 +303,7 @@ async function processRegularMessage(messageInfo, update) {
       : personalityResponse;
     
     // Save to conversation history
-    saveToConversationHistory(messageInfo, aiResponse);
+    saveToConversationHistory(chatId, text, aiResponse);
     
     // Delete thinking message and send response
     if (thinkingMessage && thinkingMessage.ok) {
@@ -351,7 +329,7 @@ async function processRegularMessage(messageInfo, update) {
 // ======================
 // MEMORY MANAGEMENT
 // ======================
-function cleanupMemory() {
+function performCleanup() {
   const now = Date.now();
   
   // Only perform cleanup if enough time has passed
@@ -382,12 +360,22 @@ function cleanupMemory() {
 // ======================
 // PERSONALITY FUNCTIONS
 // ======================
+function replacePlaceholders(text, userName, userUsername) {
+  return text
+    .replace(/{userName}/g, userName)
+    .replace(/{name}/g, userName)
+    .replace(/{userUsername}/g, userUsername);
+}
+
 function addPersonality(text, userName, userUsername) {
   if (!text) return '';
   
-  // Replace username with proper Telegram user link format
-  text = text.replace(new RegExp(`\\b${userName}\\b`, 'g'), `<a href="tg://user?id=${userUsername}">${userName}</a>`);
-  text = text.replace(new RegExp(`\\b${userName}-chan\\b`, 'g'), `<a href="tg://user?id=${userUsername}">${userName}</a>-chan`);
+  // Replace username with plain text (no HTML links to avoid display issues)
+  text = text.replace(new RegExp(`\\b${userName}\\b`, 'g'), userName);
+  text = text.replace(new RegExp(`\\b${userName}-chan\\b`, 'g'), `${userName}-chan`);
+  
+  // Replace any remaining placeholders
+  text = replacePlaceholders(text, userName, userUsername);
   
   // Remove any existing signature pattern
   const signaturePattern = new RegExp(`\\s*~ ${CONFIG.bot.name}(\\s+${CONFIG.bot.signature})?\\s*$`, 'i');
@@ -405,15 +393,13 @@ function addPersonality(text, userName, userUsername) {
   return text;
 }
 
-function saveToConversationHistory(messageInfo, aiResponse) {
-  const { chatId, text } = messageInfo;
-  
+function saveToConversationHistory(chatId, userMessage, aiResponse) {
   if (!CONVERSATION_HISTORY[chatId]) {
     CONVERSATION_HISTORY[chatId] = [];
   }
   
   CONVERSATION_HISTORY[chatId].push(
-    { role: "user", parts: [{ text: text }] },
+    { role: "user", parts: [{ text: userMessage }] },
     { role: "assistant", parts: [{ text: aiResponse }] }
   );
   
@@ -426,8 +412,7 @@ function saveToConversationHistory(messageInfo, aiResponse) {
 // ======================
 // GLM API FUNCTIONS
 // ======================
-async function getGLMResponse(messageInfo, update) {
-  const { chatId, text, userName, userUsername } = messageInfo;
+async function getGLMResponse(chatId, message, update, userName, userUsername) {
   let lastError = null;
   
   for (let attempt = 1; attempt <= CONFIG.api.glm.retryAttempts; attempt++) {
@@ -455,13 +440,13 @@ async function getGLMResponse(messageInfo, update) {
       }
       
       // Add current message
-      messages.push({ role: "user", content: text });
+      messages.push({ role: "user", content: message });
       
       // Handle reply context
       if (update.message.reply_to_message) {
         const repliedText = update.message.reply_to_message.text || '';
         const repliedFrom = update.message.reply_to_message.from.is_bot ? 'AI:' : 'User:';
-        const contextText = `Context from previous message:\n${repliedFrom} ${repliedText}\n\nUser: ${text}`;
+        const contextText = `Context from previous message:\n${repliedFrom} ${repliedText}\n\nUser: ${message}`;
         
         messages[1] = { role: "user", content: contextText };
       }
@@ -536,7 +521,7 @@ function extractGLMResponse(data, userName, userUsername) {
   }
   
   if (choice.finish_reason === "length") {
-    return `Aduh <a href="tg://user?id=${userUsername}">${userName}</a>-chan, jawabannya kepanjangan nih... 😢 Bisa tanya yang lebih spesifik? 🙏`;
+    return `Aduh ${userName}-chan, jawabannya kepanjangan nih... 😢 Bisa tanya yang lebih spesifik? 🙏`;
   }
   
   throw new Error('Unexpected response format from GLM API: no content');
