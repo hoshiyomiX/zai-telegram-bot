@@ -9,7 +9,7 @@ const CONFIG = {
     likes: ["permen", "mainan", "menggambar", "mendengar cerita", "bertemu teman baru", "bermain game", "menari"],
     hobbies: ["mengoleksi stiker lucu", "membuat origami", "menyanyi", "membantu orang lain"],
     emoji: ["😊", "✨", "🌸", "🍭", "🎀", "🤔", "🙏", "😢", "🎉", "💖", "🌟", "🎵"],
-    signature: "✨" // Changed from cat sounds to sparkle eyes
+    signature: "✨"
   },
   rateLimit: {
     duration: 60000, // 1 menit
@@ -21,10 +21,11 @@ const CONFIG = {
     timeout: 120000 // 2 menit
   },
   api: {
-    gemini: {
-      model: "gemini-2.5-pro", // Upgraded to Gemini 2.5 Pro
+    glm: {
+      model: "glm-4.5-flash",
+      baseUrl: "https://api.z.ai/v1",
       temperature: 0.8,
-      topK: 40,
+      maxTokens: 8192,
       topP: 0.95
     }
   }
@@ -212,7 +213,7 @@ function extractMessageInfo(update) {
     chatType: message.chat.type,
     userId: message.from.id,
     userName: message.from.first_name || "Teman",
-    userUsername: message.from.username || "username" // Get username for link
+    userUsername: message.from.username || "username"
   };
 }
 
@@ -285,7 +286,7 @@ async function processRegularMessage(chatId, text, update, userName, userUsernam
   const thinkingMessage = await sendTemporaryMessage(chatId, `🌸 ${CONFIG.bot.name} sedang mikir... ✨`);
   
   try {
-    const aiResponse = await getGeminiResponse(chatId, text, update, userName, userUsername);
+    const aiResponse = await getGLMResponse(chatId, text, update, userName, userUsername);
     const formattedResponse = formatToTelegramHTML(aiResponse);
     const personalityResponse = addPersonality(formattedResponse, userName, userUsername);
     
@@ -364,29 +365,36 @@ function saveToConversationHistory(chatId, userMessage, aiResponse) {
 }
 
 // ======================
-// GEMINI API FUNCTIONS
+// GLM API FUNCTIONS
 // ======================
-async function getGeminiResponse(chatId, message, update, userName, userUsername) {
+async function getGLMResponse(chatId, message, update, userName, userUsername) {
   try {
-    console.log('Sending message to Gemini 2.5 Pro...');
+    console.log('Sending message to GLM-4.5-Flash...');
     
-    const apiKey = GEMINI_API_KEY;
+    const apiKey = ZAI_API_KEY; // Changed from GEMINI_API_KEY
     if (!apiKey) {
-      throw new Error('GEMINI_API_KEY environment variable is not set');
+      throw new Error('ZAI_API_KEY environment variable is not set');
     }
     
-    // Prepare contents with personality and conversation history
-    const contents = [
-      { role: "user", parts: [{ text: PERSONALITY.systemPrompt(userName, userUsername) }] }
+    // Prepare messages with personality and conversation history
+    const messages = [
+      { role: "system", content: PERSONALITY.systemPrompt(userName, userUsername) }
     ];
     
     // Add conversation history if available
     if (CONVERSATION_HISTORY[chatId] && CONVERSATION_HISTORY[chatId].length > 0) {
-      contents.push(...CONVERSATION_HISTORY[chatId]);
+      // Convert Gemini format to OpenAI format
+      CONVERSATION_HISTORY[chatId].forEach(msg => {
+        if (msg.role === "user") {
+          messages.push({ role: "user", content: msg.parts[0].text });
+        } else if (msg.role === "model") {
+          messages.push({ role: "assistant", content: msg.parts[0].text });
+        }
+      });
     }
     
     // Add current message
-    contents.push({ role: "user", parts: [{ text: message }] });
+    messages.push({ role: "user", content: message });
     
     // Handle reply context
     if (update.message.reply_to_message) {
@@ -394,26 +402,26 @@ async function getGeminiResponse(chatId, message, update, userName, userUsername
       const repliedFrom = update.message.reply_to_message.from.is_bot ? 'AI:' : 'User:';
       const contextText = `Context from previous message:\n${repliedFrom} ${repliedText}\n\nUser: ${message}`;
       
-      contents[1] = { role: "user", parts: [{ text: contextText }] };
+      // Replace the last user message with context
+      messages[messages.length - 1] = { role: "user", content: contextText };
     }
     
     const requestBody = {
-      contents,
-      generationConfig: CONFIG.api.gemini,
-      safetySettings: [
-        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-      ]
+      model: CONFIG.api.glm.model,
+      messages: messages,
+      temperature: CONFIG.api.glm.temperature,
+      max_tokens: CONFIG.api.glm.maxTokens,
+      top_p: CONFIG.api.glm.topP,
+      stream: false
     };
     
     const response = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.api.gemini.model}:generateContent?key=${apiKey}`,
+      `${CONFIG.api.glm.baseUrl}/chat/completions`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
           'User-Agent': `${CONFIG.bot.name} Telegram Bot`
         },
         body: JSON.stringify(requestBody)
@@ -423,47 +431,47 @@ async function getGeminiResponse(chatId, message, update, userName, userUsername
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Gemini API error:', errorText);
+      console.error('GLM API error:', errorText);
       
       if (errorText.includes("tokens") && (errorText.includes("exceed") || errorText.includes("limit"))) {
         throw new Error('TOKEN_LIMIT');
       }
       
-      throw new Error(`Gemini API returned ${response.status}: ${errorText}`);
+      throw new Error(`GLM API returned ${response.status}: ${errorText}`);
     }
     
     const data = await response.json();
-    console.log('Gemini response received');
+    console.log('GLM response received');
     
-    return extractGeminiResponse(data, userName, userUsername);
+    return extractGLMResponse(data, userName, userUsername);
   } catch (error) {
-    console.error('Error getting Gemini response:', error);
+    console.error('Error getting GLM response:', error);
     throw error;
   }
 }
 
-function extractGeminiResponse(data, userName, userUsername) {
-  if (!data.candidates || data.candidates.length === 0) {
-    throw new Error('Unexpected response format from Gemini API: no candidates');
+function extractGLMResponse(data, userName, userUsername) {
+  if (!data.choices || data.choices.length === 0) {
+    throw new Error('Unexpected response format from GLM API: no choices');
   }
   
-  const candidate = data.candidates[0];
+  const choice = data.choices[0];
   
-  if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-    let responseText = candidate.content.parts[0].text;
+  if (choice.message && choice.message.content) {
+    let responseText = choice.message.content;
     
-    if (candidate.finishReason === "MAX_TOKENS") {
+    if (choice.finish_reason === "length") {
       responseText += `\n\n⚠️ [Note: Response reached maximum length. The answer may be incomplete. Please ask for more specific details if needed.] ${CONFIG.bot.signature}`;
     }
     
     return responseText;
   }
   
-  if (candidate.finishReason === "MAX_TOKENS") {
+  if (choice.finish_reason === "length") {
     return `Aduh ${userName}-chan, jawabannya kepanjangan nih... 😢 Bisa tanya yang lebih spesifik? 🙏 ${CONFIG.bot.signature}`;
   }
   
-  throw new Error('Unexpected response format from Gemini API: no content parts');
+  throw new Error('Unexpected response format from GLM API: no content');
 }
 
 // ======================
@@ -493,18 +501,12 @@ function formatToTelegramHTML(text) {
     }
   );
   
-  // Text formatting - PERBAIKAN: Urutan diprioritaskan untuk menghindari konflik
-  // Bold (prioritas tinggi)
+  // Text formatting
   formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-  
-  // Italic
   formatted = formatted.replace(/\*([^*]+)\*/g, '<i>$1</i>');
-  
-  // Underline
   formatted = formatted.replace(/__([^_]+)__/g, '<u>$1</u>');
   
-  // PERBAIKAN: Strikethrough dengan aturan lebih ketat
-  // Hanya konversi jika ada 2 tanda tilde (~~) dan tidak ada spasi di dalamnya
+  // Strikethrough with stricter rules
   formatted = formatted.replace(/~~([^~\s]+)~~/g, '<s>$1</s>');
   
   // Headers
