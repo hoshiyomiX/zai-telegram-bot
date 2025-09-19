@@ -38,15 +38,7 @@ const CONFIG = {
 // ======================
 const RATE_LIMIT = {};
 const CONVERSATION_HISTORY = {};
-
-// Memory cleanup
-setInterval(() => {
-  Object.keys(CONVERSATION_HISTORY).forEach(chatId => {
-    if (CONVERSATION_HISTORY[chatId].length > CONFIG.memory.maxHistoryPerChat) {
-      CONVERSATION_HISTORY[chatId] = CONVERSATION_HISTORY[chatId].slice(-CONFIG.memory.maxHistoryPerChat);
-    }
-  });
-}, CONFIG.memory.cleanupInterval);
+let lastCleanupTime = Date.now();
 
 // ======================
 // PERSONALITY TEMPLATES
@@ -148,6 +140,9 @@ addEventListener('fetch', event => {
 
 async function handleRequest(event) {
   const request = event.request;
+  
+  // Perform cleanup if needed
+  performCleanup();
   
   if (request.method === 'GET') {
     return new Response(`${CONFIG.bot.name} is running!`);
@@ -329,6 +324,37 @@ async function processRegularMessage(chatId, text, update, userName, userUsernam
       await sendMessage(chatId, PERSONALITY.errors.general(userName, userUsername));
     }
   }
+}
+
+// ======================
+// MEMORY MANAGEMENT
+// ======================
+function performCleanup() {
+  const now = Date.now();
+  
+  // Only perform cleanup if enough time has passed
+  if (now - lastCleanupTime < CONFIG.memory.cleanupInterval) {
+    return;
+  }
+  
+  console.log('Performing memory cleanup...');
+  lastCleanupTime = now;
+  
+  // Clean up conversation history
+  Object.keys(CONVERSATION_HISTORY).forEach(chatId => {
+    if (CONVERSATION_HISTORY[chatId].length > CONFIG.memory.maxHistoryPerChat) {
+      CONVERSATION_HISTORY[chatId] = CONVERSATION_HISTORY[chatId].slice(-CONFIG.memory.maxHistoryPerChat);
+    }
+  });
+  
+  // Clean up expired rate limits
+  Object.keys(RATE_LIMIT).forEach(userId => {
+    if (now > RATE_LIMIT[userId].resetTime) {
+      delete RATE_LIMIT[userId];
+    }
+  });
+  
+  console.log('Memory cleanup completed');
 }
 
 // ======================
