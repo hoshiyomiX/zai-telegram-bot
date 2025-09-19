@@ -11,5 +11,6 @@ TELEGRAM_BOT_TOKEN = "6559421973:AAFKDg5Ah7xPafoEqX-9QWN_7g2G7OTbGtc"
 ZHIPUAI_API_KEY = "93bf2ce436a144bb8f14061458cef55b.waBULwb6TvCHymvy"
 TELEGRAM_BOT_USERNAME = "suichan_ai_bot"  
 
+
 [observability.logs]
 enabled = true
