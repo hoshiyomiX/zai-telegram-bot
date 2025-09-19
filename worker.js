@@ -8,23 +8,28 @@ const CONFIG = {
     traits: ["ceria", "imajinatif", "penasaran", "ramah", "sedikit ceroboh", "manis"],
     likes: ["permen", "mainan", "menggambar", "mendengar cerita", "bertemu teman baru", "bermain dengan bintang ✨"],
     emoji: ["😊", "✨", "🌸", "🍭", "🎀", "🤔", "🙏", "😢", "🎉", "💖"],
-    signature: "✨" // Signature blink eyes
+    signature: "✨"
   },
   rateLimit: {
-    duration: 60000, // 1 menit
+    duration: 60000,
     maxRequests: 5
   },
   response: {
     maxLength: 8000,
     maxChunks: 2,
-    timeout: 120000 // 2 menit
+    timeout: 120000
   },
   api: {
     glm: {
-      model: "glm-4.5-flash",
+      model: "GLM-4.5-Flash",
       temperature: 0.8,
-      maxTokens: 8192
+      maxTokens: 8192,
+      retryAttempts: 2
     }
+  },
+  memory: {
+    maxHistoryPerChat: 20,
+    cleanupInterval: 3600000 // 1 jam
   }
 };
 
@@ -33,6 +38,15 @@ const CONFIG = {
 // ======================
 const RATE_LIMIT = {};
 const CONVERSATION_HISTORY = {};
+
+// Memory cleanup
+setInterval(() => {
+  Object.keys(CONVERSATION_HISTORY).forEach(chatId => {
+    if (CONVERSATION_HISTORY[chatId].length > CONFIG.memory.maxHistoryPerChat) {
+      CONVERSATION_HISTORY[chatId] = CONVERSATION_HISTORY[chatId].slice(-CONFIG.memory.maxHistoryPerChat);
+    }
+  });
+}, CONFIG.memory.cleanupInterval);
 
 // ======================
 // PERSONALITY TEMPLATES
@@ -65,11 +79,13 @@ Ingat:
 2. Tambahkan emoji yang sesuai dengan suasana
 3. Berikan jawaban yang ramah dan menyenangkan
 4. Jika tidak tahu jawabannya, katakan dengan jujur tapi tetap dengan gaya ${CONFIG.bot.name}
-5. Akhiri jawaban dengan tanda tangan "~ ${CONFIG.bot.name} ${CONFIG.bot.signature}"
-6. Jika menyebut nama pengguna, gunakan format: <a href="https://t.me/${userUsername}">${userName}</a>
+5. Akhiri jawaban dengan tanda tangan "\\n\\n~ ${CONFIG.bot.name} ${CONFIG.bot.signature}"
+6. Jika menyebut nama pengguna, gunakan format: <a href="tg://user?id=${userUsername}">${userName}</a>
 
 Contoh jawaban ${CONFIG.bot.name}:
-"Haiii <a href="https://t.me/${userUsername}">${userName}</a>-chan! 😊✨ Tentu saja ${CONFIG.bot.name} akan bantu menjelaskan! [jawaban informatif] Semoga membantu ya! ~ ${CONFIG.bot.name} ${CONFIG.bot.signature}"
+"Haiii <a href="tg://user?id=${userUsername}">${userName}</a>-chan! 😊✨ Tentu saja ${CONFIG.bot.name} akan bantu menjelaskan! [jawaban informatif] 
+
+~ ${CONFIG.bot.name} ${CONFIG.bot.signature}"
 
 Sekarang, jawab pertanyaan berikut dengan gaya ${CONFIG.bot.name}:`,
 
@@ -84,7 +100,7 @@ Sekarang, jawab pertanyaan berikut dengan gaya ${CONFIG.bot.name}:`,
 
   greetings: {
     start: (userName, userUsername) => `🌸 <b>Haiii! Aku ${CONFIG.bot.name}! ✨</b> 🌸\n\n` +
-           `Aku adalah asisten AI yang imut dan berusia ${CONFIG.bot.age}! Aku suka membantu <a href="https://t.me/${userUsername}">${userName}</a>-chan! 🍭\n\n` +
+           `Aku adalah asisten AI yang imut dan berusia ${CONFIG.bot.age}! Aku suka membantu <a href="tg://user?id=${userUsername}">${userName}</a>-chan! 🍭\n\n` +
            `Ayo kita berteman dan belajar bersama-sama! 🎀\n\n` +
            `Commands:\n` +
            `/start - Perkenalan dari ${CONFIG.bot.name}\n` +
@@ -93,7 +109,7 @@ Sekarang, jawab pertanyaan berikut dengan gaya ${CONFIG.bot.name}:`,
            `Tanyakan apa saja pada ${CONFIG.bot.name} ya! 😊`,
 
     help: (userName, userUsername) => `📖 <b>Bantuan dari ${CONFIG.bot.name}! ✨</b> 📖\n\n` +
-          `Hai <a href="https://t.me/${userUsername}">${userName}</a>-chan! ${CONFIG.bot.name} akan bantu menjelaskan cara menggunakan aku! 🌸\n\n` +
+          `Hai <a href="tg://user?id=${userUsername}">${userName}</a>-chan! ${CONFIG.bot.name} akan bantu menjelaskan cara menggunakan aku! 🌸\n\n` +
           `Cara menggunakan ${CONFIG.bot.name}:\n` +
           `• Tanyakan apa saja pada ${CONFIG.bot.name}\n` +
           `• ${CONFIG.bot.name} akan jawab dengan cara yang imut dan menyenangkan\n` +
@@ -105,19 +121,20 @@ Sekarang, jawab pertanyaan berikut dengan gaya ${CONFIG.bot.name}:`,
           `Ayo berteman dengan ${CONFIG.bot.name}! 😊🍭`,
 
     about: (userName, userUsername) => `🌸 <b>Tentang ${CONFIG.bot.name}! ✨</b> 🌸\n\n` +
-           `Hai <a href="https://t.me/${userUsername}">${userName}</a>-chan! Aku akan cerita tentang diriku! 🎀\n\n` +
+           `Hai <a href="tg://user?id=${userUsername}">${userName}</a>-chan! Aku akan cerita tentang diriku! 🎀\n\n` +
            `👤 Nama: ${CONFIG.bot.name}\n` +
            `🎂 Umur: ${CONFIG.bot.age}\n` +
            `💖 Sifat: ${CONFIG.bot.traits.join(', ')}\n\n` +
            `🍭 Suka: ${CONFIG.bot.likes.join(', ')}\n\n` +
-           `${CONFIG.bot.name} senang bisa berteman dengan <a href="https://t.me/${userUsername}">${userName}</a>-chan! Ayo kita jadi teman baik ya! 😊✨`
+           `${CONFIG.bot.name} senang bisa berteman dengan <a href="tg://user?id=${userUsername}">${userName}</a>-chan! Ayo kita jadi teman baik ya! 😊✨`
   },
 
   errors: {
-    rateLimit: (userName, userUsername) => `⚠️ Maaf <a href="https://t.me/${userUsername}">${userName}</a>-chan, ${CONFIG.bot.name} butuh istirahat dulu. Nanti kita ngobrol lagi ya dalam 1 menit! 😊`,
-    timeout: (userName, userUsername) => `Aduh <a href="https://t.me/${userUsername}">${userName}</a>-chan, ${CONFIG.bot.name} kebanyakan mikir nih... 🤔 Bisa tanya lagi yang lebih sederhana? 🙏`,
-    tokenLimit: (userName, userUsername) => `Aduh, maaf <a href="https://t.me/${userUsername}">${userName}</a>-chan! Pertanyaannya terlalu panjang buat ${CONFIG.bot.name}... 😢 Bisa dibagi jadi beberapa bagian? 🙏`,
-    general: (userName, userUsername) => `Aduh, maaf <a href="https://t.me/${userUsername}">${userName}</a>-chan! ${CONFIG.bot.name} lagi pusing nih... 😵 Bisa tolong tanya lagi nanti? 🙏`,
+    rateLimit: (userName, userUsername) => `⚠️ Maaf <a href="tg://user?id=${userUsername}">${userName}</a>-chan, ${CONFIG.bot.name} butuh istirahat dulu. Nanti kita ngobrol lagi ya dalam 1 menit! 😊`,
+    timeout: (userName, userUsername) => `Aduh <a href="tg://user?id=${userUsername}">${userName}</a>-chan, ${CONFIG.bot.name} kebanyakan mikir nih... 🤔 Bisa tanya lagi yang lebih sederhana? 🙏`,
+    tokenLimit: (userName, userUsername) => `Aduh, maaf <a href="tg://user?id=${userUsername}">${userName}</a>-chan! Pertanyaannya terlalu panjang buat ${CONFIG.bot.name}... 😢 Bisa dibagi jadi beberapa bagian? 🙏`,
+    general: (userName, userUsername) => `Aduh, maaf <a href="tg://user?id=${userUsername}">${userName}</a>-chan! ${CONFIG.bot.name} lagi pusing nih... 😵 Bisa tolong tanya lagi nanti? 🙏`,
+    apiError: (userName, userUsername) => `Aduh <a href="tg://user?id=${userUsername}">${userName}</a>-chan! ${CONFIG.bot.name} nggak bisa terhubung ke otaknya nih... 😢 Bisa coba lagi nanti? 🙏`,
     truncated: `📝 <i>[Respons dipotong karena terlalu panjang. ${CONFIG.bot.name} maaf ya... 😢]</i>`
   }
 };
@@ -208,7 +225,7 @@ function extractMessageInfo(update) {
     chatType: message.chat.type,
     userId: message.from.id,
     userName: message.from.first_name || "Teman",
-    userUsername: message.from.username || "username"
+    userUsername: message.from.username || message.from.id // Fallback to user ID if no username
   };
 }
 
@@ -304,7 +321,13 @@ async function processRegularMessage(chatId, text, update, userName, userUsernam
     if (thinkingMessage && thinkingMessage.ok) {
       await deleteMessage(chatId, thinkingMessage.result.message_id);
     }
-    await sendMessage(chatId, PERSONALITY.errors.general(userName, userUsername));
+    
+    // Specific error handling
+    if (error.message === 'API_ERROR') {
+      await sendMessage(chatId, PERSONALITY.errors.apiError(userName, userUsername));
+    } else {
+      await sendMessage(chatId, PERSONALITY.errors.general(userName, userUsername));
+    }
   }
 }
 
@@ -321,19 +344,21 @@ function replacePlaceholders(text, userName, userUsername) {
 function addPersonality(text, userName, userUsername) {
   if (!text) return '';
   
-  // Replace username with link format
-  text = text.replace(new RegExp(`\\b${userName}\\b`, 'g'), `<a href="https://t.me/${userUsername}">${userName}</a>`);
-  text = text.replace(new RegExp(`\\b${userName}-chan\\b`, 'g'), `<a href="https://t.me/${userUsername}">${userName}</a>-chan`);
+  // Replace username with proper Telegram user link format
+  text = text.replace(new RegExp(`\\b${userName}\\b`, 'g'), `<a href="tg://user?id=${userUsername}">${userName}</a>`);
+  text = text.replace(new RegExp(`\\b${userName}-chan\\b`, 'g'), `<a href="tg://user?id=${userUsername}">${userName}</a>-chan`);
   
-  // Replace other placeholders
+  // Replace any remaining placeholders
   text = replacePlaceholders(text, userName, userUsername);
   
-  // Add signature if not present
-  if (!text.includes(CONFIG.bot.name)) {
-    text += `\n\n~ ${CONFIG.bot.name} ${CONFIG.bot.signature}`;
-  }
+  // Remove any existing signature pattern
+  const signaturePattern = new RegExp(`\\s*~ ${CONFIG.bot.name}(\\s+${CONFIG.bot.signature})?\\s*$`, 'i');
+  text = text.replace(signaturePattern, '');
   
-  // Add random expression (30% chance)
+  // Add the signature with a blank line before it
+  text += `\n\n~ ${CONFIG.bot.name} ${CONFIG.bot.signature}`;
+  
+  // Add a random cute expression (30% chance)
   if (Math.random() < 0.3) {
     const randomExpression = PERSONALITY.expressions[Math.floor(Math.random() * PERSONALITY.expressions.length)];
     text += randomExpression;
@@ -353,8 +378,8 @@ function saveToConversationHistory(chatId, userMessage, aiResponse) {
   );
   
   // Keep only last 10 exchanges (20 messages)
-  if (CONVERSATION_HISTORY[chatId].length > 20) {
-    CONVERSATION_HISTORY[chatId] = CONVERSATION_HISTORY[chatId].slice(-20);
+  if (CONVERSATION_HISTORY[chatId].length > CONFIG.memory.maxHistoryPerChat) {
+    CONVERSATION_HISTORY[chatId] = CONVERSATION_HISTORY[chatId].slice(-CONFIG.memory.maxHistoryPerChat);
   }
 }
 
@@ -362,81 +387,94 @@ function saveToConversationHistory(chatId, userMessage, aiResponse) {
 // GLM API FUNCTIONS
 // ======================
 async function getGLMResponse(chatId, message, update, userName, userUsername) {
-  try {
-    console.log('Sending message to GLM-4.5-Flash...');
-    
-    const apiKey = ZHIPUAI_API_KEY;
-    if (!apiKey) {
-      throw new Error('ZHIPUAI_API_KEY environment variable is not set');
-    }
-    
-    // Prepare messages with personality and conversation history
-    const messages = [
-      { role: "system", content: PERSONALITY.systemPrompt(userName, userUsername) }
-    ];
-    
-    // Add conversation history if available
-    if (CONVERSATION_HISTORY[chatId] && CONVERSATION_HISTORY[chatId].length > 0) {
-      CONVERSATION_HISTORY[chatId].forEach(msg => {
-        messages.push({
-          role: msg.role,
-          content: msg.parts[0].text
-        });
-      });
-    }
-    
-    // Add current message
-    messages.push({ role: "user", content: message });
-    
-    // Handle reply context
-    if (update.message.reply_to_message) {
-      const repliedText = update.message.reply_to_message.text || '';
-      const repliedFrom = update.message.reply_to_message.from.is_bot ? 'AI:' : 'User:';
-      const contextText = `Context from previous message:\n${repliedFrom} ${repliedText}\n\nUser: ${message}`;
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= CONFIG.api.glm.retryAttempts; attempt++) {
+    try {
+      console.log(`Sending message to GLM-4.5-Flash (attempt ${attempt})...`);
       
-      messages[1] = { role: "user", content: contextText };
-    }
-    
-    const requestBody = {
-      model: CONFIG.api.glm.model,
-      messages: messages,
-      temperature: CONFIG.api.glm.temperature,
-      max_tokens: CONFIG.api.glm.maxTokens,
-      stream: false
-    };
-    
-    const response = await fetchWithTimeout(
-      'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify(requestBody)
-      },
-      CONFIG.response.timeout
-    );
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('GLM API error:', errorText);
-      
-      if (errorText.includes("tokens") && (errorText.includes("exceed") || errorText.includes("limit"))) {
-        throw new Error('TOKEN_LIMIT');
+      const apiKey = ZHIPUAI_API_KEY;
+      if (!apiKey) {
+        throw new Error('ZHIPUAI_API_KEY environment variable is not set');
       }
       
-      throw new Error(`GLM API returned ${response.status}: ${errorText}`);
+      // Prepare messages with personality and conversation history
+      const messages = [
+        { role: "system", content: PERSONALITY.systemPrompt(userName, userUsername) }
+      ];
+      
+      // Add conversation history if available
+      if (CONVERSATION_HISTORY[chatId] && CONVERSATION_HISTORY[chatId].length > 0) {
+        CONVERSATION_HISTORY[chatId].forEach(msg => {
+          messages.push({
+            role: msg.role,
+            content: msg.parts[0].text
+          });
+        });
+      }
+      
+      // Add current message
+      messages.push({ role: "user", content: message });
+      
+      // Handle reply context
+      if (update.message.reply_to_message) {
+        const repliedText = update.message.reply_to_message.text || '';
+        const repliedFrom = update.message.reply_to_message.from.is_bot ? 'AI:' : 'User:';
+        const contextText = `Context from previous message:\n${repliedFrom} ${repliedText}\n\nUser: ${message}`;
+        
+        messages[1] = { role: "user", content: contextText };
+      }
+      
+      const requestBody = {
+        model: CONFIG.api.glm.model,
+        messages: messages,
+        temperature: CONFIG.api.glm.temperature,
+        max_tokens: CONFIG.api.glm.maxTokens,
+        stream: false
+      };
+      
+      const response = await fetchWithTimeout(
+        'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify(requestBody)
+        },
+        CONFIG.response.timeout
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('GLM API error:', errorText);
+        
+        if (errorText.includes("tokens") && (errorText.includes("exceed") || errorText.includes("limit"))) {
+          throw new Error('TOKEN_LIMIT');
+        }
+        
+        throw new Error('API_ERROR');
+      }
+      
+      const data = await response.json();
+      console.log('GLM response received');
+      
+      return extractGLMResponse(data, userName, userUsername);
+    } catch (error) {
+      lastError = error;
+      console.error(`Attempt ${attempt} failed:`, error);
+      
+      if (attempt === CONFIG.api.glm.retryAttempts) {
+        throw error;
+      }
+      
+      // Wait before retrying (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
     }
-    
-    const data = await response.json();
-    console.log('GLM response received');
-    
-    return extractGLMResponse(data, userName, userUsername);
-  } catch (error) {
-    console.error('Error getting GLM response:', error);
-    throw error;
   }
+  
+  throw lastError;
 }
 
 function extractGLMResponse(data, userName, userUsername) {
@@ -457,7 +495,7 @@ function extractGLMResponse(data, userName, userUsername) {
   }
   
   if (choice.finish_reason === "length") {
-    return `Aduh <a href="https://t.me/${userUsername}">${userName}</a>-chan, jawabannya kepanjangan nih... 😢 Bisa tanya yang lebih spesifik? 🙏`;
+    return `Aduh <a href="tg://user?id=${userUsername}">${userName}</a>-chan, jawabannya kepanjangan nih... 😢 Bisa tanya yang lebih spesifik? 🙏`;
   }
   
   throw new Error('Unexpected response format from GLM API: no content');
@@ -575,23 +613,36 @@ async function sendMessage(chatId, text) {
     
     // Split into chunks if needed
     if (text.length > 4096) {
-      const midpoint = Math.floor(text.length / 2);
-      let splitIndex = text.lastIndexOf('. ', midpoint + 500);
-      if (splitIndex === -1) splitIndex = text.lastIndexOf('\n\n', midpoint + 500);
-      if (splitIndex === -1) splitIndex = text.lastIndexOf(' ', midpoint + 500);
-      if (splitIndex === -1) splitIndex = 4096;
-      
-      const firstPart = text.substring(0, splitIndex + 1);
-      const secondPart = text.substring(splitIndex + 1).trim();
-      
-      await sendSingleMessage(chatId, firstPart + "\n\n<i>[Lanjutan...]</i>");
-      await sendSingleMessage(chatId, secondPart);
+      const chunks = splitMessage(text, 4096);
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        if (i < chunks.length - 1) {
+          await sendSingleMessage(chatId, chunk + "\n\n<i>[Lanjutan...]</i>");
+        } else {
+          await sendSingleMessage(chatId, chunk);
+        }
+      }
     } else {
       await sendSingleMessage(chatId, text);
     }
   } catch (error) {
     console.error('Error in sendMessage:', error);
   }
+}
+
+function splitMessage(text, maxLength) {
+  const chunks = [];
+  while (text.length > 0) {
+    // Try to find a good split point
+    let splitIndex = text.lastIndexOf('. ', maxLength - 100);
+    if (splitIndex === -1) splitIndex = text.lastIndexOf('\n\n', maxLength - 100);
+    if (splitIndex === -1) splitIndex = text.lastIndexOf(' ', maxLength - 100);
+    if (splitIndex === -1) splitIndex = maxLength - 100;
+    
+    chunks.push(text.substring(0, splitIndex + 1));
+    text = text.substring(splitIndex + 1).trim();
+  }
+  return chunks;
 }
 
 async function sendSingleMessage(chatId, text) {
@@ -678,4 +729,4 @@ function fetchWithTimeout(url, options, timeout = 10000) {
       setTimeout(() => reject(new Error('Request timeout')), timeout)
     )
   ]);
-                                }
+}
